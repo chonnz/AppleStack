@@ -10,6 +10,6 @@ struct SystemInfo: Codable {
     let images: Int
 
     var isRunning: Bool {
-        !version.isEmpty
+        containersRunning > 0
     }
 }

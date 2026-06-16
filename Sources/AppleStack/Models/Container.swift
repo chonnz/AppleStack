@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct Container: Identifiable, Hashable {
     let id: String
@@ -11,12 +12,12 @@ struct Container: Identifiable, Hashable {
     let cpus: Int
     let memory: String
 
-    var statusColor: String {
+    var statusColor: Color {
         switch state {
-        case .running: return "green"
-        case .exited: return "red"
-        case .paused: return "yellow"
-        case .created: return "gray"
+        case .running: return .green
+        case .exited: return .red
+        case .paused: return .yellow
+        case .created: return .gray
         }
     }
 }
