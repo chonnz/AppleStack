@@ -268,4 +268,20 @@ final class CLIBackend: ContainerServiceProtocol {
             arguments: arguments
         )
     }
+
+    /// 启动系统
+    func systemStart() async throws {
+        _ = try await executor.execute(
+            containerPath,
+            arguments: ["system", "start"]
+        )
+    }
+
+    /// 停止系统
+    func systemStop() async throws {
+        _ = try await executor.execute(
+            containerPath,
+            arguments: ["system", "stop"]
+        )
+    }
 }

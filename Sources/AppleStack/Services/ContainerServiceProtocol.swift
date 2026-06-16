@@ -31,4 +31,10 @@ protocol ContainerServiceProtocol {
 
     /// 执行容器命令
     func execCommand(containerId: String, command: [String]) async throws -> String
+
+    /// 启动系统
+    func systemStart() async throws
+
+    /// 停止系统
+    func systemStop() async throws
 }

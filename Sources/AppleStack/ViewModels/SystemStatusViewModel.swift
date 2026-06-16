@@ -37,4 +37,22 @@ final class SystemStatusViewModel {
         }
         isLoading = false
     }
+
+    func startSystem() async {
+        do {
+            try await service.systemStart()
+            await loadStatus()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func stopSystem() async {
+        do {
+            try await service.systemStop()
+            await loadStatus()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
 }
