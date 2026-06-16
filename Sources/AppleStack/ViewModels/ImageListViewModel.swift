@@ -46,7 +46,7 @@ final class ImageListViewModel {
         isLoading = false
     }
     
-    func removeImage(_ image: Image) async {
+    func deleteImage(_ image: Image) async {
         do {
             try await service.removeImage(id: image.id)
             await loadImages()

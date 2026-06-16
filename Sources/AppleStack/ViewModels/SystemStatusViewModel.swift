@@ -27,7 +27,7 @@ final class SystemStatusViewModel {
         self.service = service
     }
     
-    func loadSystemInfo() async {
+    func loadStatus() async {
         isLoading = true
         errorMessage = nil
         do {

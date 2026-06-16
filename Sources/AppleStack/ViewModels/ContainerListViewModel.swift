@@ -1,6 +1,14 @@
 import Foundation
 import SwiftUI
 
+enum ContainerFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case running = "Running"
+    case stopped = "Stopped"
+    
+    var id: String { rawValue }
+}
+
 @MainActor
 @Observable
 final class ContainerListViewModel {
@@ -8,6 +16,23 @@ final class ContainerListViewModel {
     var isLoading = false
     var errorMessage: String?
     var showAllContainers = true
+    var searchText = ""
+    var selectedFilter: ContainerFilter = .all
+    var showCreateSheet = false
+    
+    var filteredContainers: [Container] {
+        containers.filter { container in
+            let matchesFilter: Bool
+            switch selectedFilter {
+            case .all: matchesFilter = true
+            case .running: matchesFilter = container.state == .running
+            case .stopped: matchesFilter = container.state == .exited
+            }
+            let matchesSearch = searchText.isEmpty ||
+                container.name.localizedCaseInsensitiveContains(searchText)
+            return matchesFilter && matchesSearch
+        }
+    }
     
     private nonisolated(unsafe) let service: ContainerServiceProtocol
     private var refreshTask: Task<Void, Never>?
@@ -50,16 +75,7 @@ final class ContainerListViewModel {
         Task { await loadContainers() }
     }
     
-    func stopContainer(_ container: Container) async {
-        do {
-            try await service.stopContainer(id: container.id)
-            await loadContainers()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-    
-    func startContainer(_ container: Container) async {
+    func start(_ container: Container) async {
         do {
             try await service.startContainer(id: container.id)
             await loadContainers()
@@ -68,10 +84,29 @@ final class ContainerListViewModel {
         }
     }
     
-    func removeContainer(_ container: Container, force: Bool = false) async {
+    func stop(_ container: Container) async {
+        do {
+            try await service.stopContainer(id: container.id)
+            await loadContainers()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func delete(_ container: Container, force: Bool = false) async {
         do {
             try await service.removeContainer(id: container.id, force: force)
             await loadContainers()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func createContainer(config: ContainerConfig) async {
+        do {
+            try await service.createContainer(config: config)
+            await loadContainers()
+            showCreateSheet = false
         } catch {
             errorMessage = error.localizedDescription
         }
