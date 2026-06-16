@@ -15,6 +15,7 @@ final class ContainerListViewModel {
     var containers: [Container] = []
     var isLoading = false
     var errorMessage: String?
+    var showError = false
     var showAllContainers = true
     var searchText = ""
     var selectedFilter: ContainerFilter = .all
@@ -50,6 +51,7 @@ final class ContainerListViewModel {
             containers = try await service.listContainers(all: showAllContainers)
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
         isLoading = false
     }
@@ -81,6 +83,7 @@ final class ContainerListViewModel {
             await loadContainers()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
     }
     
@@ -90,6 +93,7 @@ final class ContainerListViewModel {
             await loadContainers()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
     }
     
@@ -99,6 +103,7 @@ final class ContainerListViewModel {
             await loadContainers()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
     }
     
@@ -109,6 +114,7 @@ final class ContainerListViewModel {
             showCreateSheet = false
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
     }
 }

@@ -14,6 +14,10 @@ let package = Package(
         .executableTarget(
             name: "AppleStack",
             dependencies: []
+        ),
+        .testTarget(
+            name: "AppleStackTests",
+            dependencies: ["AppleStack"]
         )
     ]
 )

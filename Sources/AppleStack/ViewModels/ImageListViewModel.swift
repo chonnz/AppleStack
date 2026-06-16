@@ -7,6 +7,7 @@ final class ImageListViewModel {
     var images: [Image] = []
     var isLoading = false
     var errorMessage: String?
+    var showError = false
     var searchText = ""
     var showPullSheet = false
     
@@ -31,6 +32,7 @@ final class ImageListViewModel {
             images = try await service.listImages()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
         isLoading = false
     }
@@ -43,6 +45,7 @@ final class ImageListViewModel {
             await loadImages()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
         isLoading = false
     }
@@ -53,6 +56,7 @@ final class ImageListViewModel {
             await loadImages()
         } catch {
             errorMessage = error.localizedDescription
+            showError = true
         }
     }
 }

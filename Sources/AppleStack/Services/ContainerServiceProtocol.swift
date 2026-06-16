@@ -37,4 +37,10 @@ protocol ContainerServiceProtocol {
 
     /// 停止系统
     func systemStop() async throws
+
+    /// 获取容器日志
+    func logs(containerId: String, follow: Bool, tail: Int?) async throws -> String
+
+    /// 获取容器资源使用情况
+    func stats(containerId: String) async throws -> ContainerStats
 }

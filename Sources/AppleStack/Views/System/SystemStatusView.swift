@@ -5,57 +5,63 @@ struct SystemStatusView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            headerView
-
-            Divider()
+            toolbar
 
             if viewModel.isLoading {
-                Spacer()
                 ProgressView("Loading system status...")
-                Spacer()
+                    .padding()
             } else if let error = viewModel.errorMessage {
-                Spacer()
-                VStack(spacing: 8) {
-                    SwiftUIImage(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                        .foregroundStyle(.yellow)
+                VStack(spacing: 12) {
+                    SwiftUI.Image(systemName: "server.rack")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.orange)
+                    Text("System status unavailable")
+                        .font(.headline)
                     Text(error)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 400)
                     Button("Retry") {
                         Task { await viewModel.loadStatus() }
                     }
+                    .buttonStyle(.borderedProminent)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 systemInfoView
             }
         }
-        .navigationTitle("System Status")
         .task {
             await viewModel.loadStatus()
         }
     }
 
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.version)
-                    .font(.headline)
-                Text(viewModel.osInfo)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+    private var toolbar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(viewModel.isRunning ? .green : .red)
+                            .frame(width: 8, height: 8)
+                        Text(viewModel.isRunning ? "Running" : "Stopped")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(viewModel.isRunning ? .green : .red)
+                    }
+                    Text(viewModel.osInfo)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
 
-            Spacer()
-
-            HStack(spacing: 12) {
-                statusIndicator
+                Spacer()
 
                 Button {
                     Task { await viewModel.startSystem() }
                 } label: {
                     Label("Start", systemImage: "play.fill")
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(viewModel.isRunning)
 
                 Button {
@@ -63,64 +69,86 @@ struct SystemStatusView: View {
                 } label: {
                     Label("Stop", systemImage: "stop.fill")
                 }
+                .buttonStyle(.bordered)
                 .disabled(!viewModel.isRunning)
             }
-        }
-        .padding()
-    }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
 
-    private var statusIndicator: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(viewModel.isRunning ? .green : .red)
-                .frame(width: 8, height: 8)
-            Text(viewModel.isRunning ? "Running" : "Stopped")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Divider()
         }
+        .background(.white)
     }
 
     private var systemInfoView: some View {
-        List {
-            Section("System Information") {
-                if let info = viewModel.systemInfo {
-                    InfoRow(label: "Version", value: info.version)
-                    InfoRow(label: "Operating System", value: info.os)
-                    InfoRow(label: "Kernel", value: info.kernel)
-                    InfoRow(label: "Architecture", value: info.arch)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // Quick stats
+                HStack(spacing: 12) {
+                    statCard(icon: "play.circle", value: "\(viewModel.systemInfo?.containersRunning ?? 0)", label: "Running")
+                    statCard(icon: "stop.circle", value: "\(viewModel.systemInfo?.containersStopped ?? 0)", label: "Stopped")
+                    statCard(icon: "photo.stack", value: "\(viewModel.systemInfo?.images ?? 0)", label: "Images")
                 }
-            }
 
-            Section("Containers") {
-                if let info = viewModel.systemInfo {
-                    InfoRow(label: "Running", value: "\(info.containersRunning)")
-                    InfoRow(label: "Stopped", value: "\(info.containersStopped)")
-                    InfoRow(label: "Total", value: "\(info.containersRunning + info.containersStopped)")
-                }
-            }
+                Divider()
 
-            Section("Images") {
-                if let info = viewModel.systemInfo {
-                    InfoRow(label: "Total Images", value: "\(info.images)")
+                // Detailed info
+                VStack(alignment: .leading, spacing: 0) {
+                    if let info = viewModel.systemInfo {
+                        DetailRow(icon: "info.circle", label: "Version", value: info.version)
+                        Divider()
+                        DetailRow(icon: "desktopcomputer", label: "OS", value: info.os)
+                        Divider()
+                        DetailRow(icon: "terminal", label: "Kernel", value: info.kernel)
+                        Divider()
+                        DetailRow(icon: "cpu", label: "Architecture", value: info.arch)
+                    }
                 }
+                .padding(.horizontal, 16)
             }
+            .padding(.vertical, 16)
         }
-        .listStyle(.inset)
     }
-}
 
-struct InfoRow: View {
-    let label: String
-    let value: String
+    private func statCard(icon: String, value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                SwiftUI.Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
 
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
             Text(value)
-                .fontWeight(.medium)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func DetailRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            SwiftUI.Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .frame(width: 28)
+
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+        }
+        .padding(.vertical, 10)
     }
 }
 

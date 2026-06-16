@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @Bindable var viewModel: SystemStatusViewModel
+    @State private var viewModel = SystemStatusViewModel(
+        service: ContainerServiceFactory.create()
+    )
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -59,7 +61,5 @@ struct MenuBarView: View {
 }
 
 #Preview {
-    MenuBarView(viewModel: SystemStatusViewModel(
-        service: ContainerServiceFactory.create()
-    ))
+    MenuBarView()
 }
