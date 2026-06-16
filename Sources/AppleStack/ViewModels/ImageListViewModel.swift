@@ -8,6 +8,7 @@ final class ImageListViewModel {
     var isLoading = false
     var errorMessage: String?
     var searchText = ""
+    var showPullSheet = false
     
     var filteredImages: [Image] {
         guard !searchText.isEmpty else { return images }
