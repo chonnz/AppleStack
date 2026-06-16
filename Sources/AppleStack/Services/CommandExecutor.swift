@@ -1,5 +1,10 @@
 import Foundation
 
+/// 超时状态包装，用于跨并发上下文安全共享
+private final class TimeoutState: @unchecked Sendable {
+    var didTimeout = false
+}
+
 /// 命令执行器，负责执行系统命令并处理超时
 actor CommandExecutor {
     /// 默认超时时间（秒）
@@ -30,10 +35,12 @@ actor CommandExecutor {
         }
 
         // 设置超时监控
+        let timeoutState = TimeoutState()
         let pid = process.processIdentifier
         let timeoutTask = Task {
             try await Task.sleep(for: .seconds(Int(timeout)))
             if process.isRunning {
+                timeoutState.didTimeout = true
                 // 发送 SIGTERM 终止进程
                 kill(pid, SIGTERM)
                 try await Task.sleep(for: .seconds(2))
@@ -46,6 +53,11 @@ actor CommandExecutor {
 
         process.waitUntilExit()
         timeoutTask.cancel()
+
+        // 检查是否因超时终止
+        if timeoutState.didTimeout {
+            throw CommandError.timeout
+        }
 
         // 检查进程退出状态
         guard process.terminationStatus == 0 else {
@@ -83,10 +95,12 @@ actor CommandExecutor {
             throw CommandError.executionFailed(error.localizedDescription)
         }
 
+        let timeoutState = TimeoutState()
         let pid = process.processIdentifier
         let timeoutTask = Task {
             try await Task.sleep(for: .seconds(Int(timeout)))
             if process.isRunning {
+                timeoutState.didTimeout = true
                 kill(pid, SIGTERM)
                 try await Task.sleep(for: .seconds(2))
                 if process.isRunning {
@@ -97,6 +111,10 @@ actor CommandExecutor {
 
         process.waitUntilExit()
         timeoutTask.cancel()
+
+        if timeoutState.didTimeout {
+            throw CommandError.timeout
+        }
 
         let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
