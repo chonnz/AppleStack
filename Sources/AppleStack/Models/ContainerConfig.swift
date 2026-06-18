@@ -9,6 +9,10 @@ struct ContainerConfig {
     var env: [String: String]
     var volumes: [String]
     var detach: Bool
+    var interactive: Bool
+    var tty: Bool
+    var autoRemove: Bool
+    var dns: String
 
     init(
         name: String = "",
@@ -18,7 +22,11 @@ struct ContainerConfig {
         ports: String = "",
         env: [String: String] = [:],
         volumes: [String] = [],
-        detach: Bool = true
+        detach: Bool = true,
+        interactive: Bool = false,
+        tty: Bool = false,
+        autoRemove: Bool = false,
+        dns: String = ""
     ) {
         self.name = name
         self.image = image
@@ -28,5 +36,9 @@ struct ContainerConfig {
         self.env = env
         self.volumes = volumes
         self.detach = detach
+        self.interactive = interactive
+        self.tty = tty
+        self.autoRemove = autoRemove
+        self.dns = dns
     }
 }

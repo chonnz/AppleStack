@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct NetworkDetailView: View {
-    let network: Network
+struct VolumeDetailView: View {
+    let volumeName: String
     let selectedTab: String
 
-    @State private var details: NetworkInspectionDetails?
+    @State private var details: VolumeInspectionDetails?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var rawInspectOutput: String?
@@ -53,18 +53,10 @@ struct NetworkDetailView: View {
                                 }
                             }
 
-                            if !details.addressRows.isEmpty {
-                                InspectorSection(title: "Addressing") {
+                            if !details.storageRows.isEmpty {
+                                InspectorSection(title: "Storage") {
                                     InspectorCard {
-                                        InspectorRows(rows: details.addressRows)
-                                    }
-                                }
-                            }
-
-                            if !details.usedBy.isEmpty {
-                                InspectorSection(title: "Used By") {
-                                    InspectorCard {
-                                        InspectorTagFlow(items: details.usedBy)
+                                        InspectorRows(rows: details.storageRows)
                                     }
                                 }
                             }
@@ -93,7 +85,7 @@ struct NetworkDetailView: View {
             }
         }
         .background(AppTheme.paneBackground)
-        .task(id: network.id) {
+        .task(id: volumeName) {
             await loadDetails()
         }
     }
@@ -103,11 +95,11 @@ struct NetworkDetailView: View {
         errorMessage = nil
 
         do {
-            let output = try await cliBackend.inspectNetworks(ids: [network.id])
+            let output = try await cliBackend.inspectVolumes(names: [volumeName])
             rawInspectOutput = output
-            details = try NetworkInspectionDetails.parse(from: output, fallback: network)
+            details = try VolumeInspectionDetails.parse(from: output, fallbackName: volumeName)
         } catch {
-            details = NetworkInspectionDetails.fallback(from: network)
+            details = VolumeInspectionDetails.fallback(name: volumeName)
             rawInspectOutput = nil
             errorMessage = error.localizedDescription
         }
@@ -116,33 +108,22 @@ struct NetworkDetailView: View {
     }
 }
 
-private struct NetworkInspectionDetails {
+private struct VolumeInspectionDetails {
     let overviewRows: [InspectorDataRow]
-    let addressRows: [InspectorDataRow]
-    let usedBy: [String]
+    let storageRows: [InspectorDataRow]
     let labels: [InspectorKeyValueItem]
     let options: [InspectorKeyValueItem]
 
-    static func fallback(from network: Network) -> NetworkInspectionDetails {
-        NetworkInspectionDetails(
-            overviewRows: [
-                .init(label: "Name", value: network.name),
-                .init(label: "ID", value: network.id, usesMonospacedFont: true),
-                .init(label: "Driver", value: network.driver),
-                .init(label: "Scope", value: network.scope),
-                .init(label: "IPAM Driver", value: network.ipamDriver),
-            ].filter(\.hasContent),
-            addressRows: [
-                .init(label: "IPv4 Subnet", value: network.subnet),
-                .init(label: "IPv4 Gateway", value: network.gateway),
-            ].filter(\.hasContent),
-            usedBy: network.containers > 0 ? ["\(network.containers) attached containers"] : [],
+    static func fallback(name: String) -> VolumeInspectionDetails {
+        VolumeInspectionDetails(
+            overviewRows: [.init(label: "Name", value: name)],
+            storageRows: [],
             labels: [],
             options: []
         )
     }
 
-    static func parse(from output: String, fallback network: Network) throws -> NetworkInspectionDetails {
+    static func parse(from output: String, fallbackName: String) throws -> VolumeInspectionDetails {
         let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]],
@@ -152,24 +133,20 @@ private struct NetworkInspectionDetails {
         }
 
         let configuration = root["configuration"] as? [String: Any]
-        let status = root["status"] as? [String: Any]
         let labels = configuration?["labels"] as? [String: Any] ?? [:]
         let options = configuration?["options"] as? [String: Any] ?? [:]
-        let usedBy = parseUsedBy(status: status, fallbackCount: network.containers)
 
         let overviewRows = [
-            InspectorDataRow(label: "Name", value: configuration?["name"] as? String ?? network.name),
-            InspectorDataRow(label: "ID", value: root["id"] as? String ?? network.id, usesMonospacedFont: true),
-            InspectorDataRow(label: "Driver", value: configuration?["plugin"] as? String ?? network.driver),
-            InspectorDataRow(label: "Mode", value: configuration?["mode"] as? String ?? ""),
-            InspectorDataRow(label: "Scope", value: network.scope),
+            InspectorDataRow(label: "Name", value: configuration?["name"] as? String ?? root["id"] as? String ?? fallbackName),
+            InspectorDataRow(label: "ID", value: root["id"] as? String ?? fallbackName, usesMonospacedFont: true),
+            InspectorDataRow(label: "Driver", value: configuration?["driver"] as? String ?? ""),
+            InspectorDataRow(label: "Format", value: configuration?["format"] as? String ?? ""),
             InspectorDataRow(label: "Created", value: inspectorFormatTimestamp(configuration?["creationDate"] as? String ?? "")),
         ].filter(\.hasContent)
 
-        let addressRows = [
-            InspectorDataRow(label: "IPv4 Subnet", value: status?["ipv4Subnet"] as? String ?? network.subnet),
-            InspectorDataRow(label: "IPv4 Gateway", value: status?["ipv4Gateway"] as? String ?? network.gateway),
-            InspectorDataRow(label: "IPv6 Subnet", value: status?["ipv6Subnet"] as? String ?? ""),
+        let storageRows = [
+            InspectorDataRow(label: "Size", value: inspectorFormatBytes(configuration?["sizeInBytes"]) ?? ""),
+            InspectorDataRow(label: "Source", value: configuration?["source"] as? String ?? "", usesMonospacedFont: true),
         ].filter(\.hasContent)
 
         let labelItems = labels.keys.sorted().map {
@@ -179,51 +156,11 @@ private struct NetworkInspectionDetails {
             InspectorKeyValueItem(key: $0, value: "\(options[$0] ?? "")")
         }
 
-        return NetworkInspectionDetails(
+        return VolumeInspectionDetails(
             overviewRows: overviewRows,
-            addressRows: addressRows,
-            usedBy: usedBy,
+            storageRows: storageRows,
             labels: labelItems,
             options: optionItems
         )
     }
-
-    private static func parseUsedBy(status: [String: Any]?, fallbackCount: Int) -> [String] {
-        guard let status else {
-            return fallbackCount > 0 ? ["\(fallbackCount) attached containers"] : []
-        }
-
-        if let members = status["containers"] as? [String] {
-            return members
-        }
-
-        if let members = status["containers"] as? [[String: Any]] {
-            let names = members.compactMap { member in
-                member["name"] as? String ?? member["id"] as? String
-            }
-            if !names.isEmpty {
-                return names
-            }
-        }
-
-        if let members = status["containers"] as? [String: Any] {
-            let names = members.keys.sorted()
-            if !names.isEmpty {
-                return names
-            }
-        }
-
-        return fallbackCount > 0 ? ["\(fallbackCount) attached containers"] : []
-    }
-}
-
-#Preview {
-    NetworkDetailView(network: Network(
-        id: "abc123",
-        name: "my-network",
-        driver: "bridge",
-        subnet: "172.20.0.0/16",
-        gateway: "172.20.0.1",
-        containers: 3
-    ), selectedTab: "Info")
 }

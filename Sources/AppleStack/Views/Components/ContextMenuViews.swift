@@ -8,6 +8,9 @@ struct ContainerContextMenu: View {
     let onRestart: () -> Void
     let onRemove: () -> Void
     let onInspect: () -> Void
+    let onKill: () -> Void
+    let onExport: () -> Void
+    let onCopy: () -> Void
 
     var body: some View {
         Group {
@@ -40,7 +43,26 @@ struct ContainerContextMenu: View {
                 Label("Inspect", systemImage: "info.circle")
             }
 
+            Button {
+                onExport()
+            } label: {
+                Label("Export", systemImage: "square.and.arrow.up")
+            }
+
+            Button {
+                onCopy()
+            } label: {
+                Label("Copy Files", systemImage: "doc.on.doc")
+            }
+
             Divider()
+
+            Button(role: .destructive) {
+                onKill()
+            } label: {
+                Label("Kill", systemImage: "bolt.fill")
+            }
+            .disabled(container.state != .running)
 
             Button(role: .destructive) {
                 onRemove()
@@ -57,6 +79,9 @@ struct ImageContextMenu: View {
     let onPull: () -> Void
     let onRemove: () -> Void
     let onInspect: () -> Void
+    let onTag: () -> Void
+    let onPush: () -> Void
+    let onSave: () -> Void
 
     var body: some View {
         Group {
@@ -70,6 +95,24 @@ struct ImageContextMenu: View {
                 onInspect()
             } label: {
                 Label("Inspect", systemImage: "info.circle")
+            }
+
+            Button {
+                onTag()
+            } label: {
+                Label("Tag", systemImage: "tag")
+            }
+
+            Button {
+                onPush()
+            } label: {
+                Label("Push", systemImage: "arrow.up.circle")
+            }
+
+            Button {
+                onSave()
+            } label: {
+                Label("Save", systemImage: "square.and.arrow.down")
             }
 
             Divider()
@@ -144,7 +187,10 @@ struct BatchOperationToolbar: View {
             onStop: {},
             onRestart: {},
             onRemove: {},
-            onInspect: {}
+            onInspect: {},
+            onKill: {},
+            onExport: {},
+            onCopy: {}
         )
 
         BatchOperationToolbar(

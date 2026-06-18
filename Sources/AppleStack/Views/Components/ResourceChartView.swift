@@ -7,13 +7,47 @@ struct ResourceChartView: View {
     let title: String
     let color: Color
     let currentValue: String
+    var subtitle: String?
+
+    private var minValue: Double {
+        dataPoints.map(\.value).min() ?? 0
+    }
+
+    private var maxValue: Double {
+        dataPoints.map(\.value).max() ?? 0
+    }
+
+    private var chartLowerBound: Double {
+        guard !dataPoints.isEmpty else { return 0 }
+        let spread = max(maxValue - minValue, 2)
+        let padded = minValue - (spread * 0.35)
+        return max(0, floor(padded / 5) * 5)
+    }
+
+    private var chartUpperBound: Double {
+        let spread = max(maxValue - minValue, 2)
+        let baseline = max(maxValue + (spread * 0.35), 10)
+        return ceil(baseline / 5) * 5
+    }
+
+    private var lastPoint: ResourceDataPoint? {
+        dataPoints.last
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
                 Spacer()
                 Text(currentValue)
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -33,7 +67,8 @@ struct ResourceChartView: View {
                 Chart(dataPoints) { point in
                     AreaMark(
                         x: .value("Time", point.timestamp),
-                        y: .value("Value", point.value)
+                        yStart: .value("Baseline", chartLowerBound),
+                        yEnd: .value("Value", point.value)
                     )
                     .foregroundStyle(color.opacity(0.3))
                     .interpolationMethod(.catmullRom)
@@ -44,12 +79,21 @@ struct ResourceChartView: View {
                     )
                     .foregroundStyle(color)
                     .interpolationMethod(.catmullRom)
+
+                    if dataPoints.count <= 12 || point.id == dataPoints.last?.id {
+                        PointMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Value", point.value)
+                        )
+                        .foregroundStyle(color)
+                        .symbolSize(point.id == dataPoints.last?.id ? 28 : 14)
+                    }
                 }
-                .chartYScale(domain: 0...100)
+                .chartYScale(domain: chartLowerBound...chartUpperBound)
                 .chartYAxis {
                     AxisMarks(position: .leading) { value in
                         AxisValueLabel {
-                            Text("\(value.as(Int.self) ?? 0)%")
+                            Text("\(Int(value.as(Double.self) ?? 0))%")
                                 .font(.system(size: 10))
                         }
                         AxisGridLine()
@@ -65,7 +109,32 @@ struct ResourceChartView: View {
                         }
                     }
                 }
-                .frame(height: 80)
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        if let lastPoint,
+                           let xPosition = proxy.position(forX: lastPoint.timestamp),
+                           let yPosition = proxy.position(forY: lastPoint.value) {
+                            Text(String(format: "%.1f%%", lastPoint.value))
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(color)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(Color(nsColor: .windowBackgroundColor).opacity(0.92))
+                                )
+                                .overlay(
+                                    Capsule(style: .continuous)
+                                        .stroke(color.opacity(0.25), lineWidth: 0.8)
+                                )
+                                .position(
+                                    x: min(max(xPosition, 32), geometry.size.width - 32),
+                                    y: max(yPosition - 14, 10)
+                                )
+                        }
+                    }
+                }
+                .frame(height: 96)
             }
         }
         .padding(12)
@@ -114,23 +183,41 @@ struct MonitorDashboardView: View {
     let memoryHistory: [ResourceDataPoint]
     let currentCPU: String
     let currentMemory: String
+    var cpuSubtitle: String?
+    var memorySubtitle: String?
 
     var body: some View {
-        VStack(spacing: 16) {
-            ResourceChartView(
-                dataPoints: cpuHistory,
-                title: "CPU Usage",
-                color: .blue,
-                currentValue: currentCPU
-            )
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                cpuChart
+                memoryChart
+            }
 
-            ResourceChartView(
-                dataPoints: memoryHistory,
-                title: "Memory Usage",
-                color: .purple,
-                currentValue: currentMemory
-            )
+            VStack(spacing: 16) {
+                cpuChart
+                memoryChart
+            }
         }
+    }
+
+    private var cpuChart: some View {
+        ResourceChartView(
+            dataPoints: cpuHistory,
+            title: "CPU Usage",
+            color: .blue,
+            currentValue: currentCPU,
+            subtitle: cpuSubtitle
+        )
+    }
+
+    private var memoryChart: some View {
+        ResourceChartView(
+            dataPoints: memoryHistory,
+            title: "Memory Usage",
+            color: .purple,
+            currentValue: currentMemory,
+            subtitle: memorySubtitle
+        )
     }
 }
 
@@ -153,7 +240,9 @@ struct MonitorDashboardView: View {
             ResourceDataPoint(timestamp: Date(), value: 67),
         ],
         currentCPU: "40.25%",
-        currentMemory: "67.50%"
+        currentMemory: "67.50%",
+        cpuSubtitle: "Peak 55%",
+        memorySubtitle: "Peak 68%"
     )
     .padding()
     .frame(width: 400, height: 250)

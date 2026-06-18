@@ -1,132 +1,103 @@
 import SwiftUI
 
-enum AppSection: String, CaseIterable, Identifiable {
-    case dashboard = "Dashboard"
-    case containers = "Containers"
-    case images = "Images"
-    case volumes = "Volumes"
-    case networks = "Networks"
-    case machines = "Machines"
-    case system = "System"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .dashboard: "chart.bar.fill"
-        case .containers: "square.stack"
-        case .images: "photo.stack"
-        case .volumes: "externaldrive"
-        case .networks: "network"
-        case .machines: "desktopcomputer"
-        case .system: "gearshape"
-        }
-    }
-
-    var category: SidebarCategory {
-        switch self {
-        case .dashboard: .general
-        case .containers, .images, .volumes, .networks: .docker
-        case .machines: .linux
-        case .system: .general
-        }
-    }
-}
-
-enum SidebarCategory: String, CaseIterable {
-    case docker = "Docker"
-    case linux = "Linux"
-    case general = "General"
-}
-
 struct SidebarView: View {
     @Binding var selectedSection: AppSection
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Docker section
-            SidebarCategoryHeader(title: "Docker")
-            VStack(spacing: 1) {
-                ForEach([AppSection.containers, .images, .volumes, .networks], id: \.self) { section in
-                    SidebarItem(
-                        section: section,
-                        isSelected: selectedSection == section
-                    ) {
-                        selectedSection = section
-                    }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    SidebarGroup(title: "Docker", sections: [.containers, .volumes, .images, .networks], selectedSection: $selectedSection)
+                    
+                    SidebarGroup(title: "Linux", sections: [.machines], selectedSection: $selectedSection)
+                    
+                    SidebarGroup(title: "Tools", sections: [.registry, .builder], selectedSection: $selectedSection)
+                    
+                    SidebarGroup(title: "General", sections: [.dashboard, .system], selectedSection: $selectedSection)
                 }
+                .padding(.horizontal, 10)
+                .padding(.top, 14)
             }
-            .padding(.horizontal, 8)
-
-            // Linux section
-            SidebarCategoryHeader(title: "Linux")
-            VStack(spacing: 1) {
-                SidebarItem(
-                    section: .machines,
-                    isSelected: selectedSection == .machines
-                ) {
-                    selectedSection = .machines
-                }
-            }
-            .padding(.horizontal, 8)
-
-            // General section
-            SidebarCategoryHeader(title: "General")
-            VStack(spacing: 1) {
-                ForEach([AppSection.dashboard, .system], id: \.self) { section in
-                    SidebarItem(
-                        section: section,
-                        isSelected: selectedSection == section
-                    ) {
-                        selectedSection = section
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
 
             Spacer()
-        }
-        .frame(width: 180)
-        .background(Color(nsColor: .windowBackgroundColor))
-    }
-}
 
-private struct SidebarCategoryHeader: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-    }
-}
-
-private struct SidebarItem: View {
-    let section: AppSection
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                SwiftUI.Image(systemName: section.icon)
-                    .font(.system(size: 14))
-                    .frame(width: 20, height: 20)
-                Text(section.rawValue)
+            HStack(spacing: 10) {
+                SwiftUI.Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(.secondary.opacity(0.9))
+                Text("AppleStack")
                     .font(.system(size: 13, weight: .medium))
                 Spacer()
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .foregroundStyle(isSelected ? .white : .primary)
-            .background(isSelected ? Color.purple : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .overlay(alignment: .top) {
+                Divider()
+            }
+        }
+        .background(AppTheme.chromeBackground)
+    }
+}
+
+struct SidebarGroup: View {
+    let title: String
+    let sections: [AppSection]
+    @Binding var selectedSection: AppSection
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(AppTheme.sidebarGroupText)
+                .padding(.leading, 10)
+                .padding(.bottom, 4)
+            
+            ForEach(sections, id: \.self) { section in
+                SidebarItem(
+                    title: section.rawValue,
+                    icon: section.icon,
+                    isSelected: selectedSection == section
+                ) {
+                    selectedSection = section
+                }
+            }
+        }
+    }
+}
+
+struct SidebarItem: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 11) {
+                SwiftUI.Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 18)
+                Text(title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .foregroundStyle(AppTheme.sidebarText)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isSelected ? AppTheme.sidebarSelection : (isHovered ? AppTheme.sidebarHover : Color.clear))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onHover { isHovered = $0 }
     }
 }
 

@@ -20,6 +20,11 @@ final class ContainerListViewModel {
     var searchText = ""
     var selectedFilter: ContainerFilter = .all
     var showCreateSheet = false
+    var inspectOutput = ""
+    var showInspectSheet = false
+    var showCopySheet = false
+    var copySource = ""
+    var copyDestination = ""
     
     var filteredContainers: [Container] {
         containers.filter { container in
@@ -50,7 +55,7 @@ final class ContainerListViewModel {
         do {
             containers = try await service.listContainers(all: showAllContainers)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
         }
         isLoading = false
@@ -82,7 +87,7 @@ final class ContainerListViewModel {
             try await service.startContainer(id: container.id)
             await loadContainers()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
         }
     }
@@ -92,7 +97,7 @@ final class ContainerListViewModel {
             try await service.stopContainer(id: container.id)
             await loadContainers()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
         }
     }
@@ -102,7 +107,7 @@ final class ContainerListViewModel {
             try await service.removeContainer(id: container.id, force: force)
             await loadContainers()
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
         }
     }
@@ -113,7 +118,58 @@ final class ContainerListViewModel {
             await loadContainers()
             showCreateSheet = false
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+        }
+    }
+
+    func inspect(_ container: Container) async {
+        do {
+            inspectOutput = try await service.inspectContainers(ids: [container.id])
+            showInspectSheet = true
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+        }
+    }
+
+    func kill(_ container: Container) async {
+        do {
+            try await service.killContainers(ids: [container.id], signal: nil, all: false)
+            await loadContainers()
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+        }
+    }
+
+    func pruneStoppedContainers() async {
+        do {
+            try await service.pruneContainers()
+            await loadContainers()
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+        }
+    }
+
+    func export(_ container: Container, to outputPath: String) async {
+        do {
+            _ = try await service.exportContainer(id: container.id, outputPath: outputPath)
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+        }
+    }
+
+    func copyPath() async {
+        do {
+            try await service.copyContainerPath(source: copySource, destination: copyDestination)
+            showCopySheet = false
+            copySource = ""
+            copyDestination = ""
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
         }
     }

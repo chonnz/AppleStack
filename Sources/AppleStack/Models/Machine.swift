@@ -59,18 +59,27 @@ struct MachineConfig {
     var cpus: Int
     var memory: String
     var disk: String
+    var homeMount: String
+    var setDefault: Bool
+    var noBoot: Bool
 
     init(
         name: String = "",
-        image: String = "ubuntu:latest",
+        image: String = "",
         cpus: Int = 2,
-        memory: String = "2g",
-        disk: String = "20g"
+        memory: String = "2G",
+        disk: String = "20g",
+        homeMount: String = "",
+        setDefault: Bool = false,
+        noBoot: Bool = false
     ) {
         self.name = name
         self.image = image
         self.cpus = cpus
         self.memory = memory
         self.disk = disk
+        self.homeMount = homeMount
+        self.setDefault = setDefault
+        self.noBoot = noBoot
     }
 }

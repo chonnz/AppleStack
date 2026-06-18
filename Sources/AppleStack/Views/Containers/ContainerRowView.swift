@@ -8,6 +8,11 @@ struct ContainerRowView: View {
     let onDelete: () -> Void
     let onRestart: (() -> Void)?
     let onInspect: (() -> Void)?
+    let onKill: (() -> Void)?
+    let onExport: (() -> Void)?
+    let onCopy: (() -> Void)?
+
+    @State private var isHovered = false
 
     init(
         container: Container,
@@ -16,7 +21,10 @@ struct ContainerRowView: View {
         onStop: @escaping () -> Void,
         onDelete: @escaping () -> Void,
         onRestart: (() -> Void)? = nil,
-        onInspect: (() -> Void)? = nil
+        onInspect: (() -> Void)? = nil,
+        onKill: (() -> Void)? = nil,
+        onExport: (() -> Void)? = nil,
+        onCopy: (() -> Void)? = nil
     ) {
         self.container = container
         self.isSelected = isSelected
@@ -25,53 +33,64 @@ struct ContainerRowView: View {
         self.onDelete = onDelete
         self.onRestart = onRestart
         self.onInspect = onInspect
+        self.onKill = onKill
+        self.onExport = onExport
+        self.onCopy = onCopy
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            // Status dot
-            Circle()
-                .fill(container.statusColor)
-                .frame(width: 8, height: 8)
-                .padding(.leading, 8)
+            ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(iconBackground)
+                    .frame(width: 34, height: 34)
 
-            // Container icon
-            SwiftUI.Image(systemName: "shippingbox.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
+                SwiftUI.Image(systemName: "cube.box.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(iconForeground)
+                
+                Circle()
+                    .fill(container.statusColor)
+                    .frame(width: 8, height: 8)
+                    .overlay(Circle().stroke(Color.white.opacity(0.95), lineWidth: 1.5))
+                    .offset(x: 2, y: 2)
+            }
 
-            // Name and image
             VStack(alignment: .leading, spacing: 2) {
                 Text(container.name)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.white : .primary)
                     .lineLimit(1)
                 Text(container.image)
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.78) : .secondary)
                     .lineLimit(1)
             }
 
             Spacer()
 
-            // Action buttons
             HStack(spacing: 4) {
                 if container.state == .running {
-                    IconButton(systemName: "link", action: {}, tooltip: "Ports")
-                    IconButton(systemName: "stop.fill", action: onStop, tooltip: "Stop")
-                        .foregroundStyle(.red)
+                    IconButton(systemName: "link", action: {})
+                    IconButton(systemName: "square.fill", action: onStop)
+                        .foregroundStyle(actionColor)
                 } else {
-                    IconButton(systemName: "play.fill", action: onStart, tooltip: "Start")
-                        .foregroundStyle(.green)
+                    IconButton(systemName: "play.fill", action: onStart)
+                        .foregroundStyle(actionColor)
                 }
-                IconButton(systemName: "trash", action: onDelete, tooltip: "Delete")
-                    .foregroundStyle(.secondary)
+                IconButton(systemName: "trash.fill", action: onDelete)
+                    .foregroundStyle(actionColor)
             }
-            .padding(.trailing, 8)
+            .opacity(isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
-        .padding(.horizontal, 8)
-        .background(isSelected ? Color.purple.opacity(0.1) : Color.clear)
+        .padding(.horizontal, 10)
+        .background(rowBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovered = hovering
+        }
         .contextMenu {
             ContainerContextMenu(
                 container: container,
@@ -79,25 +98,48 @@ struct ContainerRowView: View {
                 onStop: onStop,
                 onRestart: onRestart ?? {},
                 onRemove: onDelete,
-                onInspect: onInspect ?? {}
+                onInspect: onInspect ?? {},
+                onKill: onKill ?? {},
+                onExport: onExport ?? {},
+                onCopy: onCopy ?? {}
             )
         }
+    }
+
+    private var rowBackground: some ShapeStyle {
+        if isSelected {
+            return AnyShapeStyle(AppTheme.listSelection)
+        }
+        if isHovered {
+            return AnyShapeStyle(AppTheme.listHover)
+        }
+        return AnyShapeStyle(Color.clear)
+    }
+
+    private var iconBackground: Color {
+        isSelected ? Color.white.opacity(0.18) : Color.orange.opacity(0.16)
+    }
+
+    private var iconForeground: Color {
+        isSelected ? .white : .orange
+    }
+
+    private var actionColor: Color {
+        isSelected ? .white.opacity(0.92) : .secondary
     }
 }
 
 private struct IconButton: View {
     let systemName: String
     let action: () -> Void
-    var tooltip: String = ""
 
     var body: some View {
         Button(action: action) {
             SwiftUI.Image(systemName: systemName)
-                .font(.system(size: 12))
+                .font(.system(size: 13, weight: .medium))
                 .frame(width: 24, height: 24)
         }
         .buttonStyle(.plain)
-        .help(tooltip)
     }
 }
 

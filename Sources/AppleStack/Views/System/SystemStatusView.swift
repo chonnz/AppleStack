@@ -35,6 +35,9 @@ struct SystemStatusView: View {
         .task {
             await viewModel.loadStatus()
         }
+        .sheet(isPresented: $viewModel.showOutputSheet) {
+            InspectOutputSheet(title: viewModel.outputTitle, output: viewModel.outputText)
+        }
     }
 
     private var toolbar: some View {
@@ -77,7 +80,7 @@ struct SystemStatusView: View {
 
             Divider()
         }
-        .background(.white)
+        .background(AppTheme.paneBackground)
     }
 
     private var systemInfoView: some View {
@@ -88,6 +91,23 @@ struct SystemStatusView: View {
                     statCard(icon: "play.circle", value: "\(viewModel.systemInfo?.containersRunning ?? 0)", label: "Running")
                     statCard(icon: "stop.circle", value: "\(viewModel.systemInfo?.containersStopped ?? 0)", label: "Stopped")
                     statCard(icon: "photo.stack", value: "\(viewModel.systemInfo?.images ?? 0)", label: "Images")
+                }
+
+                Divider()
+
+                HStack(spacing: 10) {
+                    systemActionButton("Version", icon: "number") {
+                        Task { await viewModel.showVersion() }
+                    }
+                    systemActionButton("Disk Usage", icon: "internaldrive") {
+                        Task { await viewModel.showDiskUsage() }
+                    }
+                    systemActionButton("Logs", icon: "doc.text") {
+                        Task { await viewModel.showLogs() }
+                    }
+                    systemActionButton("Properties", icon: "list.bullet.rectangle") {
+                        Task { await viewModel.showProperties() }
+                    }
                 }
 
                 Divider()
@@ -130,6 +150,14 @@ struct SystemStatusView: View {
         .padding(16)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func systemActionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
     }
 
     private func DetailRow(icon: String, label: String, value: String) -> some View {

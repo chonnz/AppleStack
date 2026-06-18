@@ -2,91 +2,90 @@ import SwiftUI
 
 struct MachineDetailView: View {
     let machine: Machine
-    @State private var selectedTab = 0
+    let selectedTab: String
 
-    private let tabs = ["Info", "Terminal"]
+    @StateObject private var terminalSession: PersistentTerminalSession
+    @State private var inspectOutput: String?
+    @State private var isLoadingInspect = false
+    @State private var inspectError: String?
+
+    private let cliBackend = CLIBackend()
+
+    init(machine: Machine, selectedTab: String) {
+        self.machine = machine
+        self.selectedTab = selectedTab
+        self._terminalSession = StateObject(wrappedValue: PersistentTerminalSession(
+            target: .machine(id: machine.id)
+        ))
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            HStack(spacing: 0) {
-                ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                    Button {
-                        selectedTab = index
-                    } label: {
-                        Text(tab)
-                            .font(.system(size: 13, weight: .medium))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .foregroundStyle(selectedTab == index ? .black : .secondary)
-                            .background(selectedTab == index ? Color(nsColor: .controlBackgroundColor) : Color.clear)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.white)
-
-            Divider()
-
-            // Tab content
+        Group {
             switch selectedTab {
-            case 0:
-                infoView
-            case 1:
+            case "Resources":
+                resourcesView
+            case "Terminal":
                 terminalView
+            case "Inspect":
+                inspectView
             default:
                 infoView
             }
         }
-        .background(.white)
+        .background(AppTheme.paneBackground)
+        .task(id: machine.id) {
+            await loadInspectDetails()
+        }
     }
 
-    // MARK: - Info Tab
-
     private var infoView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 0) {
-                    InfoRow(label: "Name", value: machine.name)
-                    InfoRow(label: "ID", value: machine.id)
-                    InfoRow(label: "Status", value: machine.status.rawValue)
-                    InfoRow(label: "Image", value: machine.image)
-                    InfoRow(label: "Created", value: machine.created)
-                }
-                .padding(12)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Resources")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-
-                    VStack(alignment: .leading, spacing: 0) {
-                        InfoRow(label: "CPUs", value: "\(machine.cpus)")
-                        InfoRow(label: "Memory", value: machine.memory)
-                        InfoRow(label: "Disk", value: machine.disk)
-                    }
-                    .padding(12)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-
-                if !machine.ip.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Network")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            InfoRow(label: "IP Address", value: machine.ip)
+        Group {
+            if isLoadingInspect && inspectOutput == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        InspectorSection(title: "Overview") {
+                            InspectorCard {
+                                InspectorRows(rows: [
+                                    .init(label: "Name", value: machine.name),
+                                    .init(label: "ID", value: machine.id, usesMonospacedFont: true),
+                                    .init(label: "Status", value: machine.status.rawValue),
+                                    .init(label: "Image", value: machine.image, usesMonospacedFont: true),
+                                    .init(label: "Created", value: machine.created),
+                                ].filter(\.hasContent))
+                            }
                         }
-                        .padding(12)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+
+    private var resourcesView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                InspectorSection(title: "Resources") {
+                    InspectorCard {
+                        InspectorRows(rows: [
+                            .init(label: "CPUs", value: "\(machine.cpus)"),
+                            .init(label: "Memory", value: machine.memory),
+                            .init(label: "Disk", value: machine.disk),
+                            .init(label: "IP Address", value: machine.ip),
+                        ].filter(\.hasContent))
+                    }
+                }
+
+                if let inspectError {
+                    InspectorSection(title: "Diagnostics") {
+                        InspectorCard {
+                            Text(inspectError)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                 }
             }
@@ -94,53 +93,61 @@ struct MachineDetailView: View {
         }
     }
 
-    // MARK: - Terminal Tab
-
     private var terminalView: some View {
-        VStack(spacing: 0) {
-            if machine.status != .running {
-                VStack(spacing: 12) {
-                    SwiftUI.Image(systemName: "terminal")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.secondary)
-                    Text("Machine is not running")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    Text("Start the machine to access the terminal")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    // Terminal output
-                    ScrollView([.horizontal, .vertical]) {
-                        Text("Terminal session for \(machine.name)\n\n$ ")
-                            .font(.system(size: 12, design: .monospaced))
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                    }
-                    .background(Color(nsColor: .textBackgroundColor))
+        NativeTerminalView(
+            sessionTitle: "Machine Terminal",
+            sessionSubtitle: machine.name,
+            prompt: "\(machine.name) %",
+            placeholder: "Enter shell command",
+            isAvailable: machine.status == .running,
+            unavailableTitle: "Machine is not running",
+            unavailableMessage: "Start the machine to access the terminal.",
+            session: terminalSession
+        )
+    }
 
-                    Divider()
-
-                    // Command input
-                    HStack(spacing: 8) {
-                        Text("$")
-                            .font(.system(size: 12, design: .monospaced))
+    private var inspectView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                InspectorSection(title: "Inspect") {
+                    InspectorCard {
+                        Text(inspectOutput?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? inspectOutput! : "No inspect output available")
+                            .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
-
-                        TextField("Enter command...", text: .constant(""))
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 12, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(12)
-                    .background(Color(nsColor: .controlBackgroundColor))
+                }
+
+                if let inspectError {
+                    InspectorSection(title: "Diagnostics") {
+                        InspectorCard {
+                            Text(inspectError)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
             }
+            .padding(16)
         }
     }
+
+    private func loadInspectDetails() async {
+        isLoadingInspect = true
+        inspectError = nil
+
+        do {
+            inspectOutput = try await cliBackend.inspectMachine(id: machine.id)
+        } catch {
+            inspectOutput = nil
+            inspectError = error.localizedDescription
+        }
+
+        isLoadingInspect = false
+    }
+
 }
 
 #Preview {
@@ -153,5 +160,5 @@ struct MachineDetailView: View {
         memory: "2g",
         disk: "20g",
         ip: "192.168.64.2"
-    ))
+    ), selectedTab: "Info")
 }
