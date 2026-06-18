@@ -31,15 +31,11 @@ enum AppSection: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @State private var selectedSection: AppSection? = .containers
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var containerViewModel = ContainerListViewModel(
-        service: ContainerServiceFactory.create()
-    )
-    @State private var imageViewModel = ImageListViewModel(
-        service: ContainerServiceFactory.create()
-    )
-    @State private var systemViewModel = SystemStatusViewModel(
-        service: ContainerServiceFactory.create()
-    )
+    @Environment(\.cliBackend) private var cliBackend
+
+    @State private var containerViewModel: ContainerListViewModel?
+    @State private var imageViewModel: ImageListViewModel?
+    @State private var systemViewModel: SystemStatusViewModel?
     @State private var selectedContainer: Container?
     @State private var selectedImage: Image?
     @State private var selectedVolume: String?
@@ -68,43 +64,54 @@ struct ContentView: View {
                 case .dashboard:
                     MonitorView()
                 case .containers:
-                    ContainerListView(
-                        viewModel: containerViewModel,
-                        selectedContainer: $selectedContainer,
-                        showsSidebarToggle: showsCollapsedSidebarToggle,
-                        onToggleSidebar: showSidebar
-                    )
+                    if let vm = containerViewModel {
+                        ContainerListView(
+                            viewModel: vm,
+                            selectedContainer: $selectedContainer,
+                            showsSidebarToggle: showsCollapsedSidebarToggle,
+                            onToggleSidebar: showSidebar
+                        )
+                    }
                 case .images:
-                    ImageListView(
-                        viewModel: imageViewModel,
-                        selectedImage: $selectedImage,
-                        showsSidebarToggle: showsCollapsedSidebarToggle,
-                        onToggleSidebar: showSidebar
-                    )
+                    if let vm = imageViewModel {
+                        ImageListView(
+                            viewModel: vm,
+                            selectedImage: $selectedImage,
+                            showsSidebarToggle: showsCollapsedSidebarToggle,
+                            onToggleSidebar: showSidebar
+                        )
+                    }
                 case .volumes:
                     VolumeListView(
                         selectedVolume: $selectedVolume,
                         showsSidebarToggle: showsCollapsedSidebarToggle,
                         onToggleSidebar: showSidebar
                     )
+                    .environment(\.cliBackend, cliBackend)
                 case .networks:
                     NetworkListView(
                         selectedNetwork: $selectedNetwork,
                         showsSidebarToggle: showsCollapsedSidebarToggle,
                         onToggleSidebar: showSidebar
                     )
+                    .environment(\.cliBackend, cliBackend)
                 case .machines:
                     MachineListView(
                         showsSidebarToggle: showsCollapsedSidebarToggle,
                         onToggleSidebar: showSidebar,
                         selectedMachine: $selectedMachine
                     )
+                    .environment(\.cliBackend, cliBackend)
                 case .registry:
                     RegistryView()
+                        .environment(\.cliBackend, cliBackend)
                 case .builder:
                     BuilderView()
+                        .environment(\.cliBackend, cliBackend)
                 case .system:
-                    SystemStatusView(viewModel: systemViewModel)
+                    if let vm = systemViewModel {
+                        SystemStatusView(viewModel: vm)
+                    }
                 case .none:
                     Text("Select an item")
                         .foregroundStyle(.secondary)
@@ -128,6 +135,11 @@ struct ContentView: View {
             .ignoresSafeArea(.container, edges: .top)
         }
         .frame(minWidth: 1000, minHeight: 600)
+        .onAppear {
+            containerViewModel = ContainerListViewModel(service: cliBackend)
+            imageViewModel = ImageListViewModel(service: cliBackend)
+            systemViewModel = SystemStatusViewModel(service: cliBackend)
+        }
     }
 
     private func showSidebar() {
@@ -191,8 +203,6 @@ private struct DetailPanel: View {
                     .layoutPriority(1)
 
                 Spacer()
-
-                trailingControlsView
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -214,11 +224,17 @@ private struct DetailPanel: View {
             } else if let machine = selectedMachine, section == .machines {
                 MachineDetailView(machine: machine, selectedTab: selectedDetailTab)
             } else {
-                VStack {
+                VStack(spacing: 12) {
                     Spacer()
+                    SwiftUI.Image(systemName: section.icon)
+                        .font(.system(size: 56))
+                        .foregroundStyle(.tertiary)
                     Text("No Selection")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.gray.opacity(0.4))
+                    Text("Select an item from the list")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -315,60 +331,6 @@ private struct DetailPanel: View {
         .fixedSize()
     }
 
-    @ViewBuilder
-    private var trailingControlsView: some View {
-        ViewThatFits(in: .horizontal) {
-            fullTrailingControls
-            compactTrailingControls
-            minimalTrailingControls
-        }
-    }
-
-    private var fullTrailingControls: some View {
-        HStack(spacing: 10) {
-            detailBadge(text: "Personal use only", horizontalPadding: 12)
-            externalButton(padded: true)
-        }
-        .fixedSize()
-    }
-
-    private var compactTrailingControls: some View {
-        HStack(spacing: 8) {
-            detailBadge(text: "Personal", horizontalPadding: 10)
-            externalButton(padded: false)
-        }
-        .fixedSize()
-    }
-
-    private var minimalTrailingControls: some View {
-        externalButton(padded: false)
-            .fixedSize()
-    }
-
-    private func detailBadge(text: String, horizontalPadding: CGFloat) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, 7)
-            .background(AppTheme.badgeBackground)
-            .foregroundStyle(AppTheme.badgeForeground)
-            .clipShape(Capsule())
-    }
-
-    private func externalButton(padded: Bool) -> some View {
-        Button(action: {}) {
-            SwiftUI.Image(systemName: "arrow.up.forward.square")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-                .padding(padded ? 7 : 6)
-                .background(AppTheme.detailTabBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(AppTheme.subtleBorder, lineWidth: 0.8)
-                )
-        }
-        .buttonStyle(.plain)
-    }
 }
 
 private struct DetailTab: View {
