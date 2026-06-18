@@ -6,14 +6,49 @@ struct SidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    SidebarGroup(title: "Docker", sections: [.containers, .volumes, .images, .networks], selectedSection: $selectedSection)
-                    
-                    SidebarGroup(title: "Linux", sections: [.machines], selectedSection: $selectedSection)
-                    
-                    SidebarGroup(title: "Tools", sections: [.registry, .builder], selectedSection: $selectedSection)
-                    
-                    SidebarGroup(title: "General", sections: [.dashboard, .system], selectedSection: $selectedSection)
+                VStack(alignment: .leading, spacing: 2) {
+                    SidebarItem(title: "Containers", icon: "cube.box.fill", iconTint: ModuleTint.containers, isSelected: selectedSection == .containers) {
+                        selectedSection = .containers
+                    }
+                    SidebarItem(title: "Images", icon: "square.3.layers.3d.down.right", iconTint: ModuleTint.images, isSelected: selectedSection == .images) {
+                        selectedSection = .images
+                    }
+                    SidebarItem(title: "Volumes", icon: "externaldrive", iconTint: ModuleTint.volumes, isSelected: selectedSection == .volumes) {
+                        selectedSection = .volumes
+                    }
+                    SidebarItem(title: "Networks", icon: "network", iconTint: ModuleTint.networks, isSelected: selectedSection == .networks) {
+                        selectedSection = .networks
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+
+                    SidebarItem(title: "Machines", icon: "desktopcomputer", iconTint: ModuleTint.machines, isSelected: selectedSection == .machines) {
+                        selectedSection = .machines
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+
+                    SidebarItem(title: "Registry", icon: "person.crop.circle.badge.key", iconTint: ModuleTint.registry, isSelected: selectedSection == .registry) {
+                        selectedSection = .registry
+                    }
+                    SidebarItem(title: "Builder", icon: "hammer", iconTint: ModuleTint.builder, isSelected: selectedSection == .builder) {
+                        selectedSection = .builder
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+
+                    SidebarItem(title: "Dashboard", icon: "chart.bar.fill", iconTint: ModuleTint.dashboard, isSelected: selectedSection == .dashboard) {
+                        selectedSection = .dashboard
+                    }
+                    SidebarItem(title: "System", icon: "gearshape", iconTint: ModuleTint.system, isSelected: selectedSection == .system) {
+                        selectedSection = .system
+                    }
                 }
                 .padding(.horizontal, 10)
                 .padding(.top, 14)
@@ -40,35 +75,10 @@ struct SidebarView: View {
     }
 }
 
-struct SidebarGroup: View {
-    let title: String
-    let sections: [AppSection]
-    @Binding var selectedSection: AppSection
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(AppTheme.sidebarGroupText)
-                .padding(.leading, 10)
-                .padding(.bottom, 4)
-            
-            ForEach(sections, id: \.self) { section in
-                SidebarItem(
-                    title: section.rawValue,
-                    icon: section.icon,
-                    isSelected: selectedSection == section
-                ) {
-                    selectedSection = section
-                }
-            }
-        }
-    }
-}
-
 struct SidebarItem: View {
     let title: String
     let icon: String
+    let iconTint: Color
     let isSelected: Bool
     let action: () -> Void
 
@@ -79,6 +89,7 @@ struct SidebarItem: View {
             HStack(spacing: 11) {
                 SwiftUI.Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? .white : iconTint)
                     .frame(width: 18)
                 Text(title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
@@ -87,12 +98,12 @@ struct SidebarItem: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .foregroundStyle(AppTheme.sidebarText)
+            .foregroundStyle(isSelected ? .white : AppTheme.sidebarText)
             .background(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelected ? AppTheme.sidebarSelection : (isHovered ? AppTheme.sidebarHover : Color.clear))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isSelected ? AppTheme.accentColor : (isHovered ? AppTheme.sidebarHover : Color.clear))
             )
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()
