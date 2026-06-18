@@ -23,7 +23,7 @@ struct VolumeListView: View {
                 title: "Volumes",
                 subtitle: "\(volumes.count) volumes",
                 leadingAccessory: nil,
-                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
+                leadingInset: 0
             ) {
                 headerActions
             }
@@ -68,19 +68,23 @@ struct VolumeListView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: $selectedVolume) {
-                    ForEach(filteredVolumes, id: \.self) { volume in
-                        VolumeRowView(
-                            volume: volume,
-                            isSelected: selectedVolume == volume,
-                            onDelete: { deleteVolume(volume) },
-                            onInspect: { Task { await inspectVolume(volume) } }
-                        )
-                        .tag(volume)
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(filteredVolumes, id: \.self) { volume in
+                            VolumeRowView(
+                                volume: volume,
+                                isSelected: selectedVolume == volume,
+                                onDelete: { deleteVolume(volume) },
+                                onInspect: { Task { await inspectVolume(volume) } }
+                            )
+                            .onTapGesture {
+                                selectedVolume = volume
+                            }
+                        }
                     }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
                 }
-                .listStyle(.inset)
-                .alternatingRowBackgrounds(.enabled)
             }
         }
         .background(AppTheme.paneBackground)

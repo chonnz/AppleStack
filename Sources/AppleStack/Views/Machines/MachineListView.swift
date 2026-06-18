@@ -151,7 +151,7 @@ struct MachineListView: View {
                 title: "Machines",
                 subtitle: "\(machines.count) machines",
                 leadingAccessory: nil,
-                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
+                leadingInset: 0
             ) {
                 headerActions
             }

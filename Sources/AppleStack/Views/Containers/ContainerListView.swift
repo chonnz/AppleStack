@@ -13,7 +13,7 @@ struct ContainerListView: View {
                 title: "Containers",
                 subtitle: "\(viewModel.containers.filter { $0.state == .running }.count) running",
                 leadingAccessory: nil,
-                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
+                leadingInset: 0
             ) {
                 headerActions
             }

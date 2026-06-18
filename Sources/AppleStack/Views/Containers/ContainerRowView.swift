@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContainerRowView: View {
@@ -71,7 +72,9 @@ struct ContainerRowView: View {
 
             HStack(spacing: 4) {
                 if container.state == .running {
-                    IconButton(systemName: "link", action: {})
+                    IconButton(systemName: "link", action: openURL)
+                        .help(container.ports.isEmpty ? "No ports" : "Open in browser")
+                        .opacity(container.ports.isEmpty ? 0 : 1)
                     IconButton(systemName: "square.fill", action: onStop)
                         .foregroundStyle(actionColor)
                 } else {
@@ -126,6 +129,19 @@ struct ContainerRowView: View {
 
     private var actionColor: Color {
         isSelected ? .white.opacity(0.92) : .secondary
+    }
+
+    private func openURL() {
+        guard let firstPort = container.ports
+            .split(separator: ",")
+            .first?
+            .trimmingCharacters(in: .whitespaces)
+            .split(separator: ":")
+            .first
+            .map(String.init),
+              let url = URL(string: "http://localhost:\(firstPort)")
+        else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 

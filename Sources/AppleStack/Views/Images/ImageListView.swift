@@ -13,7 +13,7 @@ struct ImageListView: View {
                 title: "Images",
                 subtitle: viewModel.headerSubtitle,
                 leadingAccessory: nil,
-                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
+                leadingInset: 0
             ) {
                 headerActions
             }
@@ -32,9 +32,22 @@ struct ImageListView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: $selectedImage) {
-                    ForEach(viewModel.groupedImages) { group in
-                        Section {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(viewModel.groupedImages) { group in
+                            HStack {
+                                Text(group.title)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(group.images.count)")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.top, 14)
+                            .padding(.bottom, 6)
+
                             ForEach(group.images) { image in
                                 ImageRowView(
                                     image: image,
@@ -55,24 +68,15 @@ struct ImageListView: View {
                                     },
                                     onSave: { save(image) }
                                 )
-                                .tag(image)
+                                .onTapGesture {
+                                    selectedImage = image
+                                }
                             }
-                        } header: {
-                            HStack {
-                                Text(group.title)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(group.images.count)")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.tertiary)
-                            }
-                            .textCase(nil)
                         }
                     }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
                 }
-                .listStyle(.inset)
-                .alternatingRowBackgrounds(.enabled)
             }
         }
         .background(AppTheme.paneBackground)

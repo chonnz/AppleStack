@@ -23,7 +23,7 @@ struct NetworkListView: View {
                 title: "Networks",
                 subtitle: "\(networks.count) networks",
                 leadingAccessory: nil,
-                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
+                leadingInset: 0
             ) {
                 headerActions
             }
@@ -68,19 +68,23 @@ struct NetworkListView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(selection: $selectedNetwork) {
-                    ForEach(filteredNetworks) { network in
-                        NetworkRowView(
-                            network: network,
-                            isSelected: selectedNetwork?.id == network.id,
-                            onDelete: { Task { await deleteNetwork(network) } },
-                            onInspect: { Task { await inspectNetwork(network) } }
-                        )
-                        .tag(network)
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(filteredNetworks) { network in
+                            NetworkRowView(
+                                network: network,
+                                isSelected: selectedNetwork?.id == network.id,
+                                onDelete: { Task { await deleteNetwork(network) } },
+                                onInspect: { Task { await inspectNetwork(network) } }
+                            )
+                            .onTapGesture {
+                                selectedNetwork = network
+                            }
+                        }
                     }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 8)
                 }
-                .listStyle(.inset)
-                .alternatingRowBackgrounds(.enabled)
             }
         }
         .background(AppTheme.paneBackground)
