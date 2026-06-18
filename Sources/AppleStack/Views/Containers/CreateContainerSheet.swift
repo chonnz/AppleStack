@@ -36,7 +36,11 @@ struct CreateContainerSheet: View {
             }
 
             Section("Options") {
-                Toggle("Run in background", isOn: $config.detach)
+                Toggle("Run in background (--detach)", isOn: $config.detach)
+                Toggle("Interactive mode (-i)", isOn: $config.interactive)
+                Toggle("Allocate TTY (-t)", isOn: $config.tty)
+                Toggle("Auto-remove (--rm)", isOn: $config.autoRemove)
+                TextField("DNS (e.g., 8.8.8.8)", text: $config.dns)
             }
         }
         .formStyle(.grouped)
