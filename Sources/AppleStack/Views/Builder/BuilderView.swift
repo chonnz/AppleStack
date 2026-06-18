@@ -1,59 +1,52 @@
 import SwiftUI
 
 struct BuilderView: View {
+    @Environment(\.cliBackend) private var cliBackend
     @State private var output = ""
     @State private var errorMessage: String?
-    private let cliBackend = CLIBackend()
+    @State private var isRunning = false
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
-            Divider()
-            outputView
-        }
-        .background(AppTheme.paneBackground)
-        .task {
-            await status()
-        }
-    }
-
-    private var toolbar: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Builder")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Manage image builder instance")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            PaneHeader(title: "Builder", subtitle: isRunning ? "Running" : "Stopped") {
+                Button("Status") { Task { await status() } }
+                    .buttonStyle(.bordered)
+                Button("Start") { Task { await start() } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isRunning)
+                Button("Stop") { Task { await stop() } }
+                    .buttonStyle(.bordered)
+                    .disabled(!isRunning)
+                Button("Delete") { Task { await delete() } }
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.red)
             }
-            Spacer()
-            Button("Status") { Task { await status() } }
-                .buttonStyle(.bordered)
-            Button("Start") { Task { await start() } }
-                .buttonStyle(.borderedProminent)
-            Button("Stop") { Task { await stop() } }
-                .buttonStyle(.bordered)
-            Button("Delete") { Task { await delete() } }
-                .buttonStyle(.bordered)
-                .foregroundStyle(.red)
+
+            if let error = errorMessage {
+                ErrorStateView(message: error, retryAction: { Task { await status() } })
+            } else if output.isEmpty {
+                EmptyStateView(icon: "hammer", title: "Builder", subtitle: "Start the builder to begin building images")
+            } else {
+                ScrollView([.horizontal, .vertical]) {
+                    Text(output)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
+            }
         }
-        .padding(16)
         .background(AppTheme.paneBackground)
+        .task { await status() }
     }
 
-    private var outputView: some View {
-        ScrollView([.horizontal, .vertical]) {
-            Text(errorMessage ?? (output.isEmpty ? "No builder output" : output))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(errorMessage == nil ? Color.primary : Color.red)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-        }
+    private func updateRunningState() {
+        isRunning = output.localizedCaseInsensitiveContains("running")
     }
 
     private func status() async {
         await run { try await cliBackend.builderStatus(format: "json") }
+        updateRunningState()
     }
 
     private func start() async {

@@ -94,4 +94,22 @@ protocol ContainerServiceProtocol: Sendable {
 
     /// 获取容器资源使用情况
     func stats(containerId: String) async throws -> ContainerStats
+
+    // MARK: - Registry
+
+    func registryList() async throws -> String
+
+    func registryLogin(server: String, username: String?, scheme: String?, passwordStdin: Bool) async throws
+
+    func registryLogout(server: String) async throws
+
+    // MARK: - Builder
+
+    func builderStatus(format: String?) async throws -> String
+
+    func builderStart() async throws
+
+    func builderStop() async throws
+
+    func builderDelete() async throws
 }

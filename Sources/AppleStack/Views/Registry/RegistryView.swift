@@ -1,60 +1,43 @@
 import SwiftUI
 
 struct RegistryView: View {
+    @Environment(\.cliBackend) private var cliBackend
     @State private var output = ""
     @State private var errorMessage: String?
     @State private var server = ""
     @State private var username = ""
     @State private var scheme = "auto"
     @State private var showLoginSheet = false
-    private let cliBackend = CLIBackend()
 
     var body: some View {
         VStack(spacing: 0) {
-            toolbar
-            Divider()
-            outputView
-        }
-        .background(AppTheme.paneBackground)
-        .sheet(isPresented: $showLoginSheet) {
-            loginSheet
-        }
-        .task {
-            await listRegistries()
-        }
-    }
-
-    private var toolbar: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Registry")
-                    .font(.system(size: 16, weight: .semibold))
-                Text("Manage registry logins")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            PaneHeader(title: "Registry", subtitle: "Manage registry logins") {
+                Button("List") { Task { await listRegistries() } }
+                    .buttonStyle(.bordered)
+                Button("Login") { showLoginSheet = true }
+                    .buttonStyle(.borderedProminent)
+                Button("Logout") { Task { await logout() } }
+                    .buttonStyle(.bordered)
+                    .disabled(server.isEmpty)
             }
-            Spacer()
-            Button("List") { Task { await listRegistries() } }
-                .buttonStyle(.bordered)
-            Button("Login") { showLoginSheet = true }
-                .buttonStyle(.borderedProminent)
-            Button("Logout") { Task { await logout() } }
-                .buttonStyle(.bordered)
-                .disabled(server.isEmpty)
-        }
-        .padding(16)
-        .background(AppTheme.paneBackground)
-    }
 
-    private var outputView: some View {
-        ScrollView([.horizontal, .vertical]) {
-            Text(errorMessage ?? (output.isEmpty ? "No registry output" : output))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(errorMessage == nil ? Color.primary : Color.red)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
+            if let error = errorMessage {
+                ErrorStateView(message: error, retryAction: { Task { await listRegistries() } })
+            } else if output.isEmpty {
+                EmptyStateView(icon: "key.fill", title: "No registries", subtitle: "Login to a container registry")
+            } else {
+                ScrollView([.horizontal, .vertical]) {
+                    Text(output)
+                        .font(.system(size: 12, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
+            }
         }
+        .background(AppTheme.paneBackground)
+        .sheet(isPresented: $showLoginSheet) { loginSheet }
+        .task { await listRegistries() }
     }
 
     private var loginSheet: some View {
