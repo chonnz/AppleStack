@@ -46,7 +46,8 @@ final class ContainerListViewModel {
     
     init(service: ContainerServiceProtocol, refreshInterval: TimeInterval = 10) {
         self.service = service
-        self.refreshInterval = refreshInterval
+        let saved = UserDefaults.standard.double(forKey: "refreshInterval")
+        self.refreshInterval = saved >= 5 ? saved : refreshInterval
     }
     
     func loadContainers() async {

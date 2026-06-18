@@ -67,10 +67,29 @@ final class ImageListViewModel {
         images.isEmpty ? "0 items" : "\(totalSizeFormatted) total"
     }
     
+    var autoRefresh = false
+    private var refreshTask: Task<Void, Never>?
     private nonisolated(unsafe) let service: ContainerServiceProtocol
-    
+
     init(service: ContainerServiceProtocol) {
         self.service = service
+    }
+
+    func startAutoRefresh() {
+        guard autoRefresh else { return }
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { break }
+                await self?.loadImages()
+            }
+        }
+    }
+
+    func stopAutoRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
     }
     
     func loadImages() async {
