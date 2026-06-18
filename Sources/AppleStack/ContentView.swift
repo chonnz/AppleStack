@@ -344,10 +344,9 @@ private struct DetailTab: View {
             .fixedSize()
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(isSelected ? AppTheme.detailTabSelectedBackground : Color.clear)
-            .foregroundStyle(isSelected ? .primary : .secondary)
+            .background(isSelected ? AppTheme.accentColor : Color.clear)
+            .foregroundStyle(isSelected ? .white : .secondary)
             .clipShape(Capsule())
-            .shadow(color: isSelected ? Color.black.opacity(0.05) : Color.clear, radius: 1.5, y: 1)
     }
 }
 
