@@ -13,8 +13,14 @@ struct SettingsView: View {
                     TextField("Path", text: $cliPath)
                         .textFieldStyle(.roundedBorder)
                     Button("Browse...") {
-                        // 打开文件选择器
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = true
+                        panel.canChooseDirectories = false
+                        if panel.runModal() == .OK, let url = panel.url {
+                            cliPath = url.path
+                        }
                     }
+                    .buttonStyle(.bordered)
                     .buttonStyle(.bordered)
                 }
 
