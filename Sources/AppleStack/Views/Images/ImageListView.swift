@@ -6,6 +6,7 @@ struct ImageListView: View {
     var showsSidebarToggle: Bool = false
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
+    @State private var imageToDelete: Image?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,7 +55,7 @@ struct ImageListView: View {
                                     isSelected: selectedImage?.id == image.id,
                                     usageSummary: viewModel.usageSummary(for: image),
                                     isDangling: viewModel.isDanglingImage(image),
-                                    onDelete: { Task { await viewModel.deleteImage(image) } },
+                                    onDelete: { imageToDelete = image },
                                     onPull: { Task { await viewModel.pullImage(name: image.reference) } },
                                     onInspect: { Task { await viewModel.inspect(image) } },
                                     onTag: {
@@ -91,6 +92,25 @@ struct ImageListView: View {
         }
         .sheet(isPresented: $viewModel.showPushSheet) {
             PushImageSheet(viewModel: viewModel)
+        }
+        .confirmationDialog(
+            "Delete image \"\(imageToDelete?.displayTitle ?? "")\"?",
+            isPresented: .init(
+                get: { imageToDelete != nil },
+                set: { if !$0 { imageToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let img = imageToDelete {
+                    Task { await viewModel.deleteImage(img) }
+                }
+                imageToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                imageToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .sheet(isPresented: $viewModel.showBuildSheet) {
             BuildImageSheet(viewModel: viewModel)

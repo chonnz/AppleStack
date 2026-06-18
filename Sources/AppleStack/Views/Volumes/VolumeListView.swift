@@ -14,6 +14,7 @@ struct VolumeListView: View {
     @State private var showOutputSheet = false
     @State private var searchText = ""
     @State private var isSearchExpanded = false
+    @State private var volumeToDelete: String?
 
     private let cliBackend = CLIBackend()
 
@@ -74,7 +75,7 @@ struct VolumeListView: View {
                             VolumeRowView(
                                 volume: volume,
                                 isSelected: selectedVolume == volume,
-                                onDelete: { deleteVolume(volume) },
+                                onDelete: { volumeToDelete = volume },
                                 onInspect: { Task { await inspectVolume(volume) } }
                             )
                             .onTapGesture {
@@ -90,6 +91,25 @@ struct VolumeListView: View {
         .background(AppTheme.paneBackground)
         .sheet(isPresented: $showCreateSheet) {
             createVolumeSheet
+        }
+        .confirmationDialog(
+            "Delete volume \"\(volumeToDelete ?? "")\"?",
+            isPresented: .init(
+                get: { volumeToDelete != nil },
+                set: { if !$0 { volumeToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let v = volumeToDelete {
+                    deleteVolume(v)
+                }
+                volumeToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                volumeToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)

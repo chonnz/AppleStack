@@ -6,6 +6,7 @@ struct ContainerListView: View {
     var showsSidebarToggle: Bool = false
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
+    @State private var containerToDelete: Container?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,7 +42,7 @@ struct ContainerListView: View {
                                 isSelected: selectedContainer?.id == container.id,
                                 onStart: { Task { await viewModel.start(container) } },
                                 onStop: { Task { await viewModel.stop(container) } },
-                                onDelete: { Task { await viewModel.delete(container) } },
+                                onDelete: { containerToDelete = container },
                                 onRestart: {
                                     Task {
                                         await viewModel.stop(container)
@@ -101,6 +102,25 @@ struct ContainerListView: View {
             if let error = viewModel.errorMessage {
                 Text(error)
             }
+        }
+        .confirmationDialog(
+            "Delete container \"\(containerToDelete?.name ?? "")\"?",
+            isPresented: .init(
+                get: { containerToDelete != nil },
+                set: { if !$0 { containerToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let c = containerToDelete {
+                    Task { await viewModel.delete(c) }
+                }
+                containerToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                containerToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .task {
             await viewModel.loadContainers()

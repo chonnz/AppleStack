@@ -124,6 +124,7 @@ struct MachineListView: View {
     @State private var machineHomeMount = "rw"
     @State private var searchText = ""
     @State private var isSearchExpanded = false
+    @State private var machineToDelete: Machine?
     @State private var selectedMachineDistributionID = "custom"
     @State private var selectedMachineVersionID = "custom"
     @State private var isCreatingMachine = false
@@ -204,7 +205,7 @@ struct MachineListView: View {
                                 isSelected: selectedMachine?.id == machine.id,
                                 onStart: { Task { await startMachine(machine) } },
                                 onStop: { Task { await stopMachine(machine) } },
-                                onDelete: { Task { await deleteMachine(machine) } }
+                                onDelete: { machineToDelete = machine }
                             )
                             .onTapGesture {
                                 selectedMachine = machine
@@ -222,6 +223,25 @@ struct MachineListView: View {
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
+        }
+        .confirmationDialog(
+            "Delete machine \"\(machineToDelete?.name ?? "")\"?",
+            isPresented: .init(
+                get: { machineToDelete != nil },
+                set: { if !$0 { machineToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let m = machineToDelete {
+                    Task { await deleteMachine(m) }
+                }
+                machineToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                machineToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .sheet(isPresented: $showSetSheet) {
             setMachineSheet

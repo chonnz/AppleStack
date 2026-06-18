@@ -14,6 +14,7 @@ struct NetworkListView: View {
     @State private var showOutputSheet = false
     @State private var searchText = ""
     @State private var isSearchExpanded = false
+    @State private var networkToDelete: Network?
 
     private let cliBackend = CLIBackend()
 
@@ -74,7 +75,7 @@ struct NetworkListView: View {
                             NetworkRowView(
                                 network: network,
                                 isSelected: selectedNetwork?.id == network.id,
-                                onDelete: { Task { await deleteNetwork(network) } },
+                                onDelete: { networkToDelete = network },
                                 onInspect: { Task { await inspectNetwork(network) } }
                             )
                             .onTapGesture {
@@ -90,6 +91,25 @@ struct NetworkListView: View {
         .background(AppTheme.paneBackground)
         .sheet(isPresented: $showCreateSheet) {
             createNetworkSheet
+        }
+        .confirmationDialog(
+            "Delete network \"\(networkToDelete?.name ?? "")\"?",
+            isPresented: .init(
+                get: { networkToDelete != nil },
+                set: { if !$0 { networkToDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let n = networkToDelete {
+                    Task { await deleteNetwork(n) }
+                }
+                networkToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                networkToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
