@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @State private var viewModel = SystemStatusViewModel(
-        service: ContainerServiceFactory.create()
-    )
+    @Environment(\.cliBackend) private var cliBackend
+    @State private var viewModel = SystemStatusViewModel(service: ContainerServiceFactory.create())
+    @State private var containers: [Container] = []
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Circle()
                     .fill(viewModel.isRunning ? .green : .red)
@@ -15,8 +15,6 @@ struct MenuBarView: View {
                     .font(.headline)
                 Spacer()
             }
-
-            Divider()
 
             if viewModel.isLoading {
                 ProgressView()
@@ -34,29 +32,75 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if !containers.isEmpty {
+                Divider()
+
+                Text("Containers")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(containers) { container in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(container.statusColor)
+                            .frame(width: 6, height: 6)
+                        Text(container.name)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                        Spacer()
+                        if container.state == .running {
+                            Button("Stop") {
+                                Task { try? await cliBackend.stopContainer(id: container.id) }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        } else {
+                            Button("Start") {
+                                Task { try? await cliBackend.startContainer(id: container.id) }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                        }
+                    }
+                }
+            }
+
             Divider()
 
-            Button("Start System") {
-                Task { await viewModel.startSystem() }
+            Button("Open AppleStack") {
+                NSApp.activate(ignoringOtherApps: true)
             }
-            .disabled(viewModel.isRunning)
 
-            Button("Stop System") {
-                Task { await viewModel.stopSystem() }
+            Button(viewModel.isRunning ? "Stop System" : "Start System") {
+                Task {
+                    if viewModel.isRunning {
+                        try? await cliBackend.systemStop()
+                    } else {
+                        try? await cliBackend.systemStart()
+                    }
+                    await viewModel.loadStatus()
+                }
             }
-            .disabled(!viewModel.isRunning)
 
             Divider()
 
             Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
+            .keyboardShortcut("q")
         }
         .padding(8)
-        .frame(width: 200)
+        .frame(width: 240)
         .task {
             await viewModel.loadStatus()
+            await loadContainers()
         }
+    }
+
+    private func loadContainers() async {
+        containers = (try? await cliBackend.listContainers(all: false)) ?? []
     }
 }
 
