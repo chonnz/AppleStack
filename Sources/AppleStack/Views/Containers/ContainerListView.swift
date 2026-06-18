@@ -129,6 +129,14 @@ struct ContainerListView: View {
         .onDisappear {
             viewModel.stopAutoRefresh()
         }
+        .background {
+            Button("") { viewModel.showCreateSheet = true }
+                .keyboardShortcut("n", modifiers: .command)
+                .hidden()
+            Button("") { Task { await viewModel.loadContainers() } }
+                .keyboardShortcut("r", modifiers: .command)
+                .hidden()
+        }
     }
 
     private func export(_ container: Container) {
