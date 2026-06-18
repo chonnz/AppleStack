@@ -1,7 +1,7 @@
 import Foundation
 
 /// 容器服务协议，定义与容器运行时交互的接口
-protocol ContainerServiceProtocol {
+protocol ContainerServiceProtocol: Sendable {
     /// 获取系统信息
     func getSystemInfo() async throws -> SystemInfo
 
