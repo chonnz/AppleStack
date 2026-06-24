@@ -32,6 +32,35 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+func detailPanelIdentity(
+    section: AppSection,
+    selectedContainer: Container?,
+    selectedImage: Image?,
+    selectedVolume: String?,
+    selectedNetwork: Network?,
+    selectedMachine: Machine?
+) -> String? {
+    switch section {
+    case .containers:
+        guard let selectedContainer else { return nil }
+        return "containers.\(selectedContainer.id)"
+    case .images:
+        guard let selectedImage else { return nil }
+        return "images.\(selectedImage.id)"
+    case .volumes:
+        guard let selectedVolume else { return nil }
+        return "volumes.\(selectedVolume)"
+    case .networks:
+        guard let selectedNetwork else { return nil }
+        return "networks.\(selectedNetwork.id)"
+    case .machines:
+        guard let selectedMachine else { return nil }
+        return "machines.\(selectedMachine.id)"
+    default:
+        return nil
+    }
+}
+
 struct ContentView: View {
     @State private var selectedSection: AppSection? = .quickStart
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -233,25 +262,14 @@ private struct DetailPanel: View {
     }
 
     private var detailKey: String? {
-        switch section {
-        case .containers:
-            guard let selectedContainer else { return nil }
-            return "containers.\(selectedContainer.id)"
-        case .images:
-            guard let selectedImage else { return nil }
-            return "images.\(selectedImage.id)"
-        case .volumes:
-            guard let selectedVolume else { return nil }
-            return "volumes.\(selectedVolume)"
-        case .networks:
-            guard let selectedNetwork else { return nil }
-            return "networks.\(selectedNetwork.id)"
-        case .machines:
-            guard let selectedMachine else { return nil }
-            return "machines.\(selectedMachine.id)"
-        default:
-            return nil
-        }
+        detailPanelIdentity(
+            section: section,
+            selectedContainer: selectedContainer,
+            selectedImage: selectedImage,
+            selectedVolume: selectedVolume,
+            selectedNetwork: selectedNetwork,
+            selectedMachine: selectedMachine
+        )
     }
 
     var body: some View {
@@ -273,14 +291,19 @@ private struct DetailPanel: View {
 
             if let container = selectedContainer, section == .containers {
                 ContainerDetailView(container: container, selectedTab: selectedDetailTab)
+                    .id(detailKey)
             } else if let image = selectedImage, section == .images {
                 ImageDetailView(image: image, selectedTab: selectedDetailTab)
+                    .id(detailKey)
             } else if let volume = selectedVolume, section == .volumes {
                 VolumeDetailView(volumeName: volume, selectedTab: selectedDetailTab)
+                    .id(detailKey)
             } else if let network = selectedNetwork, section == .networks {
                 NetworkDetailView(network: network, selectedTab: selectedDetailTab)
+                    .id(detailKey)
             } else if let machine = selectedMachine, section == .machines {
                 MachineDetailView(machine: machine, selectedTab: selectedDetailTab)
+                    .id(detailKey)
             } else {
                 VStack(spacing: 12) {
                     Spacer()
