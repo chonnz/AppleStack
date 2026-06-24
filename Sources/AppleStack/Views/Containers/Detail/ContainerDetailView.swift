@@ -542,18 +542,6 @@ struct ContainerDetailView: View {
                     }
                 }
 
-                InspectorSection(title: language.localized("Path Format")) {
-                    InspectorCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(String(format: language.localized("Container path uses `%@:/path`. Mac path is an absolute local path."), container.id))
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            Text(language.localized("Directory browsing uses a shell listing inside the running container. Copy and export still use Apple Containers CLI operations."))
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
             }
             .padding(16)
         }
