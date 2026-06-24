@@ -10,6 +10,16 @@ struct ContainerFileEntry: Identifiable, Equatable {
     let isDirectory: Bool
 
     var id: String { name }
+
+    var kind: String {
+        if isDirectory {
+            return "Folder"
+        }
+        if permissions.hasPrefix("l") || name.contains(" -> ") {
+            return "Symlink"
+        }
+        return "File"
+    }
 }
 
 /// CLI 后端实现，通过 container 命令与容器运行时交互

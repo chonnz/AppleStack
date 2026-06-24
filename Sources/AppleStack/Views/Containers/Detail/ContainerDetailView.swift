@@ -19,6 +19,7 @@ struct ContainerDetailView: View {
     @State private var fileEntries: [ContainerFileEntry] = []
     @State private var isLoadingFiles = false
     @State private var fileBrowserError: String?
+    @State private var showsFileTransfer = false
     @State private var logSearchText = ""
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
@@ -459,8 +460,8 @@ struct ContainerDetailView: View {
                             } else {
                                 VStack(spacing: 0) {
                                     fileBrowserHeader
-                                    ForEach(fileEntries) { entry in
-                                        fileEntryRow(entry)
+                                    ForEach(Array(fileEntries.enumerated()), id: \.element.id) { index, entry in
+                                        fileEntryRow(entry, rowIndex: index)
                                     }
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -473,63 +474,70 @@ struct ContainerDetailView: View {
                     }
                 }
 
-                InspectorSection(title: language.localized("Copy Files")) {
+                InspectorSection(title: language.localized("Copy and Export")) {
                     InspectorCard {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Picker(language.localized("Direction"), selection: $copyDirection) {
-                                Text(language.localized("Container to Mac")).tag(FileCopyDirection.fromContainer)
-                                Text(language.localized("Mac to Container")).tag(FileCopyDirection.toContainer)
-                            }
-                            .pickerStyle(.segmented)
+                        DisclosureGroup(isExpanded: $showsFileTransfer) {
+                            VStack(alignment: .leading, spacing: 14) {
+                                Picker(language.localized("Direction"), selection: $copyDirection) {
+                                    Text(language.localized("Container to Mac")).tag(FileCopyDirection.fromContainer)
+                                    Text(language.localized("Mac to Container")).tag(FileCopyDirection.toContainer)
+                                }
+                                .pickerStyle(.segmented)
 
-                            TextField(language.localized("Container path"), text: $containerPath)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 12, design: .monospaced))
-
-                            HStack(spacing: 8) {
-                                TextField(language.localized("Mac path"), text: $localPath)
+                                TextField(language.localized("Container path"), text: $containerPath)
                                     .textFieldStyle(.roundedBorder)
                                     .font(.system(size: 12, design: .monospaced))
 
-                                Button {
-                                    chooseLocalPath()
-                                } label: {
-                                    SwiftUI.Image(systemName: copyDirection == .fromContainer ? "folder.badge.plus" : "folder")
+                                HStack(spacing: 8) {
+                                    TextField(language.localized("Mac path"), text: $localPath)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.system(size: 12, design: .monospaced))
+
+                                    Button {
+                                        chooseLocalPath()
+                                    } label: {
+                                        SwiftUI.Image(systemName: copyDirection == .fromContainer ? "folder.badge.plus" : "folder")
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .help(language.localized(copyDirection == .fromContainer ? "Choose output folder" : "Choose local file or folder"))
                                 }
-                                .buttonStyle(.bordered)
-                                .help(language.localized(copyDirection == .fromContainer ? "Choose output folder" : "Choose local file or folder"))
+
+                                HStack {
+                                    Button {
+                                        Task { await copyFiles() }
+                                    } label: {
+                                        Label(language.localized("Copy"), systemImage: "doc.on.doc")
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .disabled(!canCopyFiles || isRunningFileAction)
+
+                                    Button {
+                                        exportContainer()
+                                    } label: {
+                                        Label(language.localized("Export Filesystem"), systemImage: "square.and.arrow.up")
+                                    }
+                                    .buttonStyle(.bordered)
+
+                                    if isRunningFileAction {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    }
+
+                                    Spacer()
+                                }
+
+                                if let fileActionStatus {
+                                    Text(fileActionStatus)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
                             }
-
-                            HStack {
-                                Button {
-                                    Task { await copyFiles() }
-                                } label: {
-                                    Label(language.localized("Copy"), systemImage: "doc.on.doc")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(!canCopyFiles || isRunningFileAction)
-
-                                Button {
-                                    exportContainer()
-                                } label: {
-                                    Label(language.localized("Export Filesystem"), systemImage: "square.and.arrow.up")
-                                }
-                                .buttonStyle(.bordered)
-
-                                if isRunningFileAction {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
-
-                                Spacer()
-                            }
-
-                            if let fileActionStatus {
-                                Text(fileActionStatus)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                            }
+                            .padding(.top, 10)
+                        } label: {
+                            Text(language.localized("Show copy and export tools"))
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
@@ -556,10 +564,12 @@ struct ContainerDetailView: View {
         HStack(spacing: 10) {
             Text(language.localized("Name"))
                 .frame(maxWidth: .infinity, alignment: .leading)
+            Text(language.localized("Date Modified"))
+                .frame(width: 136, alignment: .leading)
             Text(language.localized("Size"))
                 .frame(width: 86, alignment: .trailing)
-            Text(language.localized("Modified"))
-                .frame(width: 120, alignment: .leading)
+            Text(language.localized("Kind"))
+                .frame(width: 86, alignment: .leading)
         }
         .font(.system(size: 11, weight: .semibold))
         .foregroundStyle(.secondary)
@@ -568,7 +578,7 @@ struct ContainerDetailView: View {
         .background(AppTheme.terminalSecondaryBackground)
     }
 
-    private func fileEntryRow(_ entry: ContainerFileEntry) -> some View {
+    private func fileEntryRow(_ entry: ContainerFileEntry, rowIndex: Int) -> some View {
         Button {
             let path = joinedContainerPath(browserPath, entry.name)
             containerPath = path
@@ -578,9 +588,20 @@ struct ContainerDetailView: View {
             }
         } label: {
             HStack(spacing: 10) {
+                Group {
+                    if entry.isDirectory {
+                        SwiftUI.Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(width: 10)
+
                 SwiftUI.Image(systemName: entry.isDirectory ? "folder.fill" : "doc")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(entry.isDirectory ? ModuleTint.volumes : .secondary)
+                    .foregroundStyle(entry.isDirectory ? Color.blue : .secondary)
                     .frame(width: 18)
 
                 Text(entry.name)
@@ -589,19 +610,25 @@ struct ContainerDetailView: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                Text(entry.modified)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 136, alignment: .leading)
+
                 Text(entry.isDirectory ? "--" : entry.size)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .frame(width: 86, alignment: .trailing)
 
-                Text(entry.modified)
+                Text(language.localized(entry.kind))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .frame(width: 120, alignment: .leading)
+                    .frame(width: 86, alignment: .leading)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
+            .background(rowIndex.isMultiple(of: 2) ? AppTheme.terminalSecondaryBackground.opacity(0.55) : Color.clear)
         }
         .buttonStyle(.plain)
         .overlay(alignment: .bottom) {

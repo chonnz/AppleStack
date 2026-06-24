@@ -502,6 +502,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Choose output folder": return "选择输出文件夹"
         case "Choose local file or folder": return "选择本地文件或文件夹"
         case "Export Filesystem": return "导出文件系统"
+        case "Copy and Export": return "复制和导出"
+        case "Show copy and export tools": return "显示复制和导出工具"
         case "Path Format": return "路径格式"
         case "Container path uses `%@:/path`. Mac path is an absolute local path.": return "容器路径使用 `%@:/path`。Mac 路径是绝对本地路径。"
         case "Apple container currently exposes copy/export operations through CLI. This view avoids pretending that random-access file browsing is available.": return "Apple container 当前通过 CLI 暴露复制/导出操作，因此此页面不会伪装成支持随机访问的文件浏览器。"
@@ -535,6 +537,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Empty folder": return "空文件夹"
         case "No files in this directory.": return "此目录没有文件。"
         case "Modified": return "修改时间"
+        case "Date Modified": return "修改时间"
+        case "Kind": return "类型"
+        case "Folder": return "文件夹"
+        case "File": return "文件"
+        case "Symlink": return "符号链接"
         case "Directory browsing uses a shell listing inside the running container. Copy and export still use Apple Containers CLI operations.": return "目录浏览会在运行中的容器内执行 Shell 列表命令；复制和导出仍使用 Apple Containers CLI 操作。"
         default: return value
         }
