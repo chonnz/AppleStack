@@ -12,7 +12,14 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
+                    SidebarGroupLabel(localized("Getting Started"))
+
+                    SidebarItem(title: localized("Quick Start"), icon: "sparkles", iconTint: ModuleTint.commands, isSelected: selectedSection == .quickStart) {
+                        selectedSection = .quickStart
+                    }
+
                     SidebarGroupLabel(localized("Containers"))
+                        .padding(.top, 10)
 
                     SidebarItem(title: localized("Containers"), icon: "cube.box.fill", iconTint: ModuleTint.containers, isSelected: selectedSection == .containers) {
                         selectedSection = .containers

@@ -110,6 +110,7 @@ struct MachineListView: View {
     var showsSidebarToggle: Bool = false
     var onToggleSidebar: () -> Void = {}
     @Binding var selectedMachine: Machine?
+    var createRequestID: Int = 0
     @State private var machines: [Machine] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -258,6 +259,10 @@ struct MachineListView: View {
         }
         .task {
             await loadMachines()
+        }
+        .onChange(of: createRequestID) { _, newValue in
+            guard newValue > 0 else { return }
+            beginCreateMachine()
         }
     }
 

@@ -138,6 +138,18 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     func localized(_ value: String) -> String {
         guard self == .simplifiedChinese else { return value }
         switch value {
+        case "Getting Started": return "开始"
+        case "Quick Start": return "快速开始"
+        case "Start using Apple containers in a few clicks.": return "用几次点击开始使用 Apple containers。"
+        case "What do you want to do?": return "你想做什么？"
+        case "Start the system": return "启动系统"
+        case "Turn on Apple Containers before creating or running anything.": return "创建或运行任何内容前，先启动 Apple Containers。"
+        case "Create a container": return "创建容器"
+        case "Run an app from an image with only a name and image.": return "只需名称和镜像即可从镜像运行应用。"
+        case "Create a virtual machine": return "创建虚拟机"
+        case "Create a Linux machine from a preset image.": return "从预设镜像创建 Linux 虚拟机。"
+        case "Open Activity Monitor": return "打开活动监视器"
+        case "See CPU, memory, network, and disk usage.": return "查看 CPU、内存、网络和磁盘占用。"
         case "Containers": return "容器"
         case "Images": return "镜像"
         case "Volumes": return "卷"

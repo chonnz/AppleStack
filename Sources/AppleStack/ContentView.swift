@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
+    case quickStart = "Quick Start"
     case activityMonitor = "Activity Monitor"
     case containers = "Containers"
     case images = "Images"
@@ -14,6 +15,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .quickStart: "sparkles"
         case .activityMonitor: "chart.line.uptrend.xyaxis"
         case .containers: "cube.box.fill"
         case .images: "square.3.layers.3d.down.right"
@@ -26,12 +28,12 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 
     var isMerged: Bool {
-        self == .activityMonitor || self == .registry || self == .commands
+        self == .quickStart || self == .activityMonitor || self == .registry || self == .commands
     }
 }
 
 struct ContentView: View {
-    @State private var selectedSection: AppSection? = .containers
+    @State private var selectedSection: AppSection? = .quickStart
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
@@ -43,6 +45,7 @@ struct ContentView: View {
     @State private var selectedVolume: String?
     @State private var selectedNetwork: Network?
     @State private var selectedMachine: Machine?
+    @State private var machineCreateRequestID = 0
 
     private var showsCollapsedSidebarToggle: Bool {
         switch columnVisibility {
@@ -75,6 +78,13 @@ struct ContentView: View {
     @ViewBuilder
     private var mergedContent: some View {
         switch selectedSection {
+        case .quickStart:
+            QuickStartView(
+                onStartSystem: { try await cliBackend.systemStart() },
+                onCreateContainer: openContainerCreateFlow,
+                onCreateMachine: openMachineCreateFlow,
+                onOpenActivityMonitor: { selectedSection = .activityMonitor }
+            )
         case .activityMonitor:
             ActivityMonitorView()
         case .registry:
@@ -91,6 +101,17 @@ struct ContentView: View {
         guard containerViewModel == nil else { return }
         containerViewModel = ContainerListViewModel(service: cliBackend)
         imageViewModel = ImageListViewModel(service: cliBackend)
+    }
+
+    private func openContainerCreateFlow() {
+        initViewModels()
+        selectedSection = .containers
+        containerViewModel?.showCreateSheet = true
+    }
+
+    private func openMachineCreateFlow() {
+        selectedSection = .machines
+        machineCreateRequestID += 1
     }
 
     private var sideBar: some View {
@@ -143,10 +164,11 @@ struct ContentView: View {
                     MachineListView(
                         showsSidebarToggle: showsCollapsedSidebarToggle,
                         onToggleSidebar: showSidebar,
-                        selectedMachine: $selectedMachine
+                        selectedMachine: $selectedMachine,
+                        createRequestID: machineCreateRequestID
                     )
                     .environment(\.cliBackend, cliBackend)
-                case .activityMonitor, .registry, .commands:
+                case .quickStart, .activityMonitor, .registry, .commands:
                     Color.clear
                 case .none:
                     Text(language.localized("Select an item"))
