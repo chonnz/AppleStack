@@ -14,43 +14,43 @@ struct SidebarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     SidebarGroupLabel(localized("Getting Started"))
 
-                    SidebarItem(title: localized("Quick Start"), icon: "sparkles", iconTint: ModuleTint.commands, isSelected: selectedSection == .quickStart) {
+                    SidebarItem(title: localized("Quick Start"), icon: "sparkles", isSelected: selectedSection == .quickStart) {
                         selectedSection = .quickStart
                     }
 
                     SidebarGroupLabel(localized("Containers"))
                         .padding(.top, 10)
 
-                    SidebarItem(title: localized("Containers"), icon: "cube.box.fill", iconTint: ModuleTint.containers, isSelected: selectedSection == .containers) {
+                    SidebarItem(title: localized("Containers"), icon: "cube.box.fill", isSelected: selectedSection == .containers) {
                         selectedSection = .containers
                     }
-                    SidebarItem(title: localized("Images"), icon: "square.3.layers.3d.down.right", iconTint: ModuleTint.images, isSelected: selectedSection == .images) {
+                    SidebarItem(title: localized("Images"), icon: "square.3.layers.3d.down.right", isSelected: selectedSection == .images) {
                         selectedSection = .images
                     }
-                    SidebarItem(title: localized("Volumes"), icon: "externaldrive", iconTint: ModuleTint.volumes, isSelected: selectedSection == .volumes) {
+                    SidebarItem(title: localized("Volumes"), icon: "externaldrive", isSelected: selectedSection == .volumes) {
                         selectedSection = .volumes
                     }
-                    SidebarItem(title: localized("Networks"), icon: "network", iconTint: ModuleTint.networks, isSelected: selectedSection == .networks) {
+                    SidebarItem(title: localized("Networks"), icon: "network", isSelected: selectedSection == .networks) {
                         selectedSection = .networks
                     }
 
                     SidebarGroupLabel("Linux")
                         .padding(.top, 10)
 
-                    SidebarItem(title: localized("Machines"), icon: "desktopcomputer", iconTint: ModuleTint.machines, isSelected: selectedSection == .machines) {
+                    SidebarItem(title: localized("Machines"), icon: "desktopcomputer", isSelected: selectedSection == .machines) {
                         selectedSection = .machines
                     }
 
                     SidebarGroupLabel(localized("General"))
                         .padding(.top, 10)
 
-                    SidebarItem(title: localized("Registry"), icon: "key.fill", iconTint: ModuleTint.registry, isSelected: selectedSection == .registry) {
+                    SidebarItem(title: localized("Registry"), icon: "key.fill", isSelected: selectedSection == .registry) {
                         selectedSection = .registry
                     }
-                    SidebarItem(title: localized("Activity Monitor"), icon: "chart.line.uptrend.xyaxis", iconTint: ModuleTint.activityMonitor, isSelected: selectedSection == .activityMonitor) {
+                    SidebarItem(title: localized("Activity Monitor"), icon: "chart.line.uptrend.xyaxis", isSelected: selectedSection == .activityMonitor) {
                         selectedSection = .activityMonitor
                     }
-                    SidebarItem(title: localized("Commands"), icon: "terminal.fill", iconTint: ModuleTint.commands, isSelected: selectedSection == .commands) {
+                    SidebarItem(title: localized("Commands"), icon: "terminal.fill", isSelected: selectedSection == .commands) {
                         selectedSection = .commands
                     }
                 }
@@ -103,7 +103,6 @@ private struct SidebarGroupLabel: View {
 struct SidebarItem: View {
     let title: String
     let icon: String
-    let iconTint: Color
     let isSelected: Bool
     let action: () -> Void
 
@@ -114,7 +113,7 @@ struct SidebarItem: View {
             HStack(spacing: 11) {
                 SwiftUI.Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(isSelected ? .white : iconTint)
+                    .foregroundStyle(isSelected ? .white : .secondary)
                     .frame(width: 18)
                 Text(title)
                     .font(.system(size: 13, weight: isSelected ? .semibold : .regular))

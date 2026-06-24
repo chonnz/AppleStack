@@ -125,9 +125,9 @@ struct RegistryView: View {
         HStack(spacing: 12) {
             SwiftUI.Image(systemName: "tray.full")
                 .font(.system(size: 18))
-                .foregroundStyle(isSelected ? Color.white : AppTheme.accentColor)
+                .foregroundStyle(isSelected ? Color.white : Color.secondary)
                 .frame(width: 32, height: 32)
-                .background(isSelected ? Color.white.opacity(0.16) : AppTheme.badgeBackground)
+                .background(isSelected ? Color.white.opacity(0.16) : Color.secondary.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {

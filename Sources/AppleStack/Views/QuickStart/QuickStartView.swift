@@ -27,7 +27,6 @@ struct QuickStartView: View {
                             title: language.localized("Start the system"),
                             subtitle: language.localized("Turn on Apple Containers before creating or running anything."),
                             icon: "power",
-                            tint: .green,
                             isBusy: isStartingSystem,
                             action: startSystem
                         )
@@ -36,7 +35,6 @@ struct QuickStartView: View {
                             title: language.localized("Create a container"),
                             subtitle: language.localized("Run an app from an image with only a name and image."),
                             icon: "cube.box.fill",
-                            tint: ModuleTint.containers,
                             action: onCreateContainer
                         )
 
@@ -44,7 +42,6 @@ struct QuickStartView: View {
                             title: language.localized("Create a virtual machine"),
                             subtitle: language.localized("Create a Linux machine from a preset image."),
                             icon: "desktopcomputer",
-                            tint: ModuleTint.machines,
                             action: onCreateMachine
                         )
 
@@ -52,7 +49,6 @@ struct QuickStartView: View {
                             title: language.localized("Open Activity Monitor"),
                             subtitle: language.localized("See CPU, memory, network, and disk usage."),
                             icon: "chart.line.uptrend.xyaxis",
-                            tint: ModuleTint.activityMonitor,
                             action: onOpenActivityMonitor
                         )
                     }
@@ -78,13 +74,7 @@ struct QuickStartView: View {
             HStack(alignment: .top, spacing: 18) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppTheme.accentColor.opacity(0.95), ModuleTint.machines.opacity(0.84)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(AppTheme.accentColor)
                     SwiftUI.Image(systemName: "shippingbox.and.arrow.backward.fill")
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(.white)
@@ -148,7 +138,6 @@ struct QuickStartView: View {
         title: String,
         subtitle: String,
         icon: String,
-        tint: Color,
         isBusy: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
@@ -156,14 +145,14 @@ struct QuickStartView: View {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(tint.opacity(0.16))
+                        .fill(Color.secondary.opacity(0.10))
                     if isBusy {
                         ProgressView()
                             .controlSize(.small)
                     } else {
                         SwiftUI.Image(systemName: icon)
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(tint)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(width: 42, height: 42)
@@ -182,10 +171,10 @@ struct QuickStartView: View {
 
                 ZStack {
                     Circle()
-                        .fill(tint.opacity(0.12))
+                        .fill(AppTheme.badgeBackground)
                     SwiftUI.Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(tint)
+                        .foregroundStyle(AppTheme.accentColor)
                 }
                 .frame(width: 24, height: 24)
                 .padding(.top, 1)
@@ -196,12 +185,6 @@ struct QuickStartView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(AppTheme.chromeBackground)
             )
-            .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(tint.opacity(0.84))
-                    .frame(height: 3)
-                    .padding(.horizontal, 12)
-            }
             .overlay(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(AppTheme.subtleBorder, lineWidth: 0.6)

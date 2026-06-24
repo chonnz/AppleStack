@@ -101,7 +101,7 @@ struct CommandsView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 SwiftUI.Image(systemName: section.icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(section.tint)
+                    .foregroundStyle(.secondary)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 4) {
