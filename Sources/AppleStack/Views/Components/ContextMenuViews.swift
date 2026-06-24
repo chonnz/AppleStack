@@ -11,27 +11,32 @@ struct ContainerContextMenu: View {
     let onKill: () -> Void
     let onExport: () -> Void
     let onCopy: () -> Void
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Group {
             Button {
                 onStart()
             } label: {
-                Label("Start", systemImage: "play.fill")
+                Label(language.localized("Start"), systemImage: "play.fill")
             }
             .disabled(container.state == .running)
 
             Button {
                 onStop()
             } label: {
-                Label("Stop", systemImage: "stop.fill")
+                Label(language.localized("Stop"), systemImage: "stop.fill")
             }
             .disabled(container.state != .running)
 
             Button {
                 onRestart()
             } label: {
-                Label("Restart", systemImage: "arrow.clockwise")
+                Label(language.localized("Restart"), systemImage: "arrow.clockwise")
             }
             .disabled(container.state != .running)
 
@@ -40,19 +45,19 @@ struct ContainerContextMenu: View {
             Button {
                 onInspect()
             } label: {
-                Label("Inspect", systemImage: "info.circle")
+                Label(language.localized("Inspect"), systemImage: "info.circle")
             }
 
             Button {
                 onExport()
             } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
+                Label(language.localized("Export"), systemImage: "square.and.arrow.up")
             }
 
             Button {
                 onCopy()
             } label: {
-                Label("Copy Files", systemImage: "doc.on.doc")
+                Label(language.localized("Copy Files"), systemImage: "doc.on.doc")
             }
 
             Divider()
@@ -60,14 +65,14 @@ struct ContainerContextMenu: View {
             Button(role: .destructive) {
                 onKill()
             } label: {
-                Label("Kill", systemImage: "bolt.fill")
+                Label(language.localized("Kill"), systemImage: "bolt.fill")
             }
             .disabled(container.state != .running)
 
             Button(role: .destructive) {
                 onRemove()
             } label: {
-                Label("Remove", systemImage: "trash")
+                Label(language.localized("Remove"), systemImage: "trash")
             }
         }
     }
@@ -82,37 +87,42 @@ struct ImageContextMenu: View {
     let onTag: () -> Void
     let onPush: () -> Void
     let onSave: () -> Void
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Group {
             Button {
                 onPull()
             } label: {
-                Label("Pull Latest", systemImage: "arrow.down.circle")
+                Label(language.localized("Pull Latest"), systemImage: "arrow.down.circle")
             }
 
             Button {
                 onInspect()
             } label: {
-                Label("Inspect", systemImage: "info.circle")
+                Label(language.localized("Inspect"), systemImage: "info.circle")
             }
 
             Button {
                 onTag()
             } label: {
-                Label("Tag", systemImage: "tag")
+                Label(language.localized("Tag"), systemImage: "tag")
             }
 
             Button {
                 onPush()
             } label: {
-                Label("Push", systemImage: "arrow.up.circle")
+                Label(language.localized("Push"), systemImage: "arrow.up.circle")
             }
 
             Button {
                 onSave()
             } label: {
-                Label("Save", systemImage: "square.and.arrow.down")
+                Label(language.localized("Save"), systemImage: "square.and.arrow.down")
             }
 
             Divider()
@@ -120,7 +130,7 @@ struct ImageContextMenu: View {
             Button(role: .destructive) {
                 onRemove()
             } label: {
-                Label("Remove", systemImage: "trash")
+                Label(language.localized("Remove"), systemImage: "trash")
             }
         }
     }
@@ -132,10 +142,15 @@ struct BatchOperationToolbar: View {
     let onStartAll: () -> Void
     let onStopAll: () -> Void
     let onRemoveAll: () -> Void
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         HStack(spacing: 12) {
-            Text("\(selectedCount) selected")
+            Text("\(selectedCount) \(language.localized("selected"))")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
@@ -146,7 +161,7 @@ struct BatchOperationToolbar: View {
                     .font(.system(size: 12))
             }
             .buttonStyle(.plain)
-            .help("Start all selected")
+            .help(language.localized("Start all selected"))
 
             Button {
                 onStopAll()
@@ -155,7 +170,7 @@ struct BatchOperationToolbar: View {
                     .font(.system(size: 12))
             }
             .buttonStyle(.plain)
-            .help("Stop all selected")
+            .help(language.localized("Stop all selected"))
 
             Button(role: .destructive) {
                 onRemoveAll()
@@ -164,7 +179,7 @@ struct BatchOperationToolbar: View {
                     .font(.system(size: 12))
             }
             .buttonStyle(.plain)
-            .help("Remove all selected")
+            .help(language.localized("Remove all selected"))
         }
     }
 }

@@ -15,14 +15,19 @@ struct NativeTerminalView: View {
     @State private var commandHistory: [String] = []
     @State private var historyIndex: Int?
     @State private var focusRequestToken = UUID()
+    @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let backgroundColor = AppTheme.terminalBackground
-    private let chromeColor = AppTheme.terminalSecondaryBackground
     private let borderColor = AppTheme.terminalBorder
     private let foregroundColor = Color.primary
     private let promptColor = Color(nsColor: NSColor.systemGreen)
     private let terminalUserColor = NSColor.systemGreen
     private let terminalHostColor = NSColor.systemBlue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +41,7 @@ struct NativeTerminalView: View {
                     prompt: displayPrompt,
                     command: $command,
                     placeholder: placeholder,
+                    fontSize: CGFloat(terminalFontSize),
                     isEnabled: isAvailable && session.isConnected,
                     focusRequestToken: focusRequestToken,
                     onSubmit: submitCurrentCommand,
@@ -86,21 +92,23 @@ struct NativeTerminalView: View {
     }
 
     private var utilityBar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(sessionSubtitle)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(foregroundColor)
-                Text(sessionTitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+        HStack(spacing: 8) {
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(sessionStatusColor)
+                    .frame(width: 7, height: 7)
 
-            Spacer()
+                Text(sessionSubtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(foregroundColor)
+                    .lineLimit(1)
+            }
 
             Text(sessionStatusText)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
 
             if session.isLaunching {
                 ProgressView()
@@ -108,32 +116,48 @@ struct NativeTerminalView: View {
             }
 
             if isAvailable, !session.isConnected, !session.isLaunching {
-                Button("Connect") {
+                terminalToolbarButton("bolt.horizontal", help: language.localized("Connect")) {
                     session.activateIfNeeded()
                 }
-                .buttonStyle(.plain)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
             }
 
-            Button("Clear") {
+            terminalToolbarButton("trash", help: language.localized("Clear terminal")) {
                 clearTranscript()
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
             .disabled(session.transcript.isEmpty)
 
-            Button("Copy") {
+            terminalToolbarButton("doc.on.doc", help: language.localized("Copy terminal output")) {
                 copyTranscript()
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .background(backgroundColor)
+    }
+
+    private var sessionStatusColor: Color {
+        if !isAvailable {
+            return .secondary
+        }
+        if session.isConnected {
+            return .green
+        }
+        if session.isLaunching {
+            return .orange
+        }
+        return .secondary
+    }
+
+    private func terminalToolbarButton(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            SwiftUI.Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(help)
     }
 
     private var unavailableView: some View {
@@ -284,7 +308,8 @@ struct NativeTerminalView: View {
         sessionSubtitle: String,
         prompt: String
     ) -> NSAttributedString {
-        let semiboldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold)
+        let fontSize = CGFloat(terminalFontSize)
+        let semiboldFont = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
         let attributed = parseANSIAttributedString(text)
 
         let cleanText = attributed.string
@@ -372,9 +397,9 @@ struct NativeTerminalView: View {
             if userLength > 0 {
                 attributed.addAttributes(
                     [
-                        .foregroundColor: terminalUserColor,
-                        .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
-                    ],
+                            .foregroundColor: terminalUserColor,
+                            .font: NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold),
+                        ],
                     range: NSRange(location: rangeStart, length: userLength)
                 )
             }
@@ -382,7 +407,7 @@ struct NativeTerminalView: View {
             attributed.addAttributes(
                 [
                     .foregroundColor: NSColor.secondaryLabelColor,
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
+                    .font: NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold),
                 ],
                 range: NSRange(location: rangeStart + userLength, length: 1)
             )
@@ -391,7 +416,7 @@ struct NativeTerminalView: View {
                 attributed.addAttributes(
                     [
                         .foregroundColor: terminalHostColor,
-                        .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
+                        .font: NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold),
                     ],
                     range: NSRange(location: rangeStart + userLength + 1, length: hostLength)
                 )
@@ -402,7 +427,7 @@ struct NativeTerminalView: View {
                 attributed.addAttributes(
                     [
                         .foregroundColor: terminalUserColor,
-                        .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
+                        .font: NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold),
                     ],
                     range: NSRange(location: rangeStart + suffixStart, length: suffixLength)
                 )
@@ -411,7 +436,7 @@ struct NativeTerminalView: View {
             attributed.addAttributes(
                 [
                     .foregroundColor: terminalUserColor,
-                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
+                    .font: NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold),
                 ],
                 range: promptRange
             )
@@ -419,8 +444,8 @@ struct NativeTerminalView: View {
     }
 
     private func parseANSIAttributedString(_ text: String) -> NSMutableAttributedString {
-        let baseFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        let boldFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold)
+        let baseFont = NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .regular)
+        let boldFont = NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold)
         var currentColor: NSColor = .labelColor
         var isBold = false
         let output = NSMutableAttributedString()
@@ -558,6 +583,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
     let prompt: String
     @Binding var command: String
     let placeholder: String
+    let fontSize: CGFloat
     let isEnabled: Bool
     let focusRequestToken: UUID
     let onSubmit: () -> Void
@@ -580,7 +606,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
         transcriptTextView.isSelectable = true
         transcriptTextView.drawsBackground = false
         transcriptTextView.textColor = .labelColor
-        transcriptTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        transcriptTextView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         transcriptTextView.textContainerInset = NSSize(width: 0, height: 0)
         transcriptTextView.isRichText = false
         transcriptTextView.usesFindBar = true
@@ -595,7 +621,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
         )
 
         let promptLabel = NSTextField(labelWithString: prompt)
-        promptLabel.font = .monospacedSystemFont(ofSize: 12, weight: .semibold)
+        promptLabel.font = .monospacedSystemFont(ofSize: fontSize, weight: .semibold)
         promptLabel.textColor = .systemGreen
 
         let commandField = TerminalCommandTextField()
@@ -604,7 +630,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
         commandField.isBezeled = false
         commandField.focusRingType = .none
         commandField.drawsBackground = false
-        commandField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        commandField.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         commandField.textColor = .labelColor
         commandField.onSubmit = onSubmit
         commandField.onHistoryUp = onHistoryUp
@@ -621,8 +647,8 @@ private struct TerminalConsoleView: NSViewRepresentable {
         let stackView = NSStackView(views: [transcriptTextView, promptRow])
         stackView.orientation = .vertical
         stackView.alignment = .leading
-        stackView.spacing = 10
-        stackView.setCustomSpacing(14, after: transcriptTextView)
+        stackView.spacing = 4
+        stackView.setCustomSpacing(6, after: transcriptTextView)
         stackView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stackView)
 
@@ -639,11 +665,11 @@ private struct TerminalConsoleView: NSViewRepresentable {
         promptRowWidthConstraint.isActive = true
 
         NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
-            stackView.widthAnchor.constraint(equalTo: contentView.widthAnchor, constant: -24),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
+            stackView.widthAnchor.constraint(equalTo: contentView.widthAnchor, constant: -28),
             commandField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180),
         ])
 
@@ -675,6 +701,9 @@ private struct TerminalConsoleView: NSViewRepresentable {
         else { return }
 
         textView.textStorage?.setAttributedString(attributedText)
+        textView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        promptLabel.font = .monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+        commandField.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         if let textContainer = textView.textContainer,
            let layoutManager = textView.layoutManager {
             layoutManager.ensureLayout(for: textContainer)

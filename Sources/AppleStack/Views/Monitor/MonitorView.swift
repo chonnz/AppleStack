@@ -1,145 +1,174 @@
 import SwiftUI
 
 struct MonitorView: View {
+    let showsTopBar: Bool
+    let isEmbedded: Bool
+    @Environment(\.cliBackend) private var cliBackend
     @State private var systemInfo: SystemInfo?
     @State private var containers: [Container] = []
     @State private var images: [Image] = []
+    @State private var volumes: [String] = []
     @State private var networks: [Network] = []
+    @State private var machines: [Machine] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
-    private let cliBackend = CLIBackend()
+    private let embeddedRefreshInterval: TimeInterval = 8.0
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
+
+    private var isRunning: Bool {
+        systemInfo?.isRunning ?? false
+    }
+
+    init(showsTopBar: Bool = true, isEmbedded: Bool = false) {
+        self.showsTopBar = showsTopBar
+        self.isEmbedded = isEmbedded
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Dashboard")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                        Text("System overview and monitoring")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(40)
-                } else if let error = errorMessage {
-                    VStack(spacing: 12) {
-                        SwiftUI.Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.orange)
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Button("Retry") {
-                            Task { await loadDashboard() }
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(40)
-                } else {
-                    // Stats cards
-                    statsSection
-
-                    // Resource usage
-                    resourceSection
-
-                    // Recent activity
-                    activitySection
+        Group {
+            if isEmbedded {
+                dashboardContent
+            } else {
+                ScrollView {
+                    dashboardContent
                 }
             }
-            .padding(.bottom, 20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
             await loadDashboard()
+            guard isEmbedded else { return }
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(embeddedRefreshInterval))
+                guard !Task.isCancelled else { break }
+                await loadDashboard(showLoading: false)
+            }
+        }
+    }
+
+    private var dashboardContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if showsTopBar {
+                topBar
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+            }
+
+            if isLoading && systemInfo == nil && containers.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(40)
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    SwiftUI.Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button(language.localized("Retry")) {
+                        Task { await loadDashboard() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(40)
+            } else {
+                statsSection
+                activitySection
+            }
+        }
+        .padding(.bottom, showsTopBar ? 20 : 0)
+    }
+
+    // MARK: - Top Bar
+
+    private var topBar: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(isRunning ? .green : .red)
+                        .frame(width: 8, height: 8)
+                    Text(language.localized(isRunning ? "Running" : "Stopped"))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(isRunning ? .green : .red)
+                }
+                Text(language.localized("Dashboard"))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+            }
+
+            Spacer()
+
+            Button {
+                Task { await loadDashboard() }
+            } label: {
+                SwiftUI.Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
         }
     }
 
     // MARK: - Stats Section
 
     private var statsSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                 StatCard(
-                    title: "Containers",
+                    title: language.localized("Containers"),
                     value: "\(containers.count)",
-                    subtitle: "\(containers.filter { $0.state == .running }.count) running",
+                    subtitle: "\(containers.filter { $0.state == .running }.count) \(language.localized("running"))",
                     icon: "shippingbox.fill",
                     color: .blue
                 )
 
                 StatCard(
-                    title: "Images",
+                    title: language.localized("Images"),
                     value: "\(images.count)",
-                    subtitle: "local images",
+                    subtitle: language.localized("local images"),
                     icon: "photo.stack.fill",
                     color: .purple
                 )
 
                 StatCard(
-                    title: "Networks",
+                    title: language.localized("Networks"),
                     value: "\(networks.count)",
-                    subtitle: "networks",
+                    subtitle: language.localized("networks"),
                     icon: "network",
                     color: .green
                 )
 
                 StatCard(
-                    title: "System",
-                    value: systemInfo?.version ?? "N/A",
-                    subtitle: systemInfo?.os ?? "",
-                    icon: "gearshape.fill",
+                    title: language.localized("Volumes"),
+                    value: "\(volumes.count)",
+                    subtitle: language.localized("volumes"),
+                    icon: "externaldrive.fill",
                     color: .orange
                 )
-            }
-            .padding(.horizontal, 20)
+
+                StatCard(
+                    title: language.localized("Machines"),
+                    value: "\(machines.count)",
+                    subtitle: "\(machines.filter { $0.status == .running }.count) \(language.localized("running"))",
+                    icon: "desktopcomputer",
+                    color: .teal
+                )
         }
+        .padding(.horizontal, 20)
     }
 
-    // MARK: - Resource Section
-
-    private var resourceSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("System Information")
-                .font(.system(size: 15, weight: .semibold))
-                .padding(.horizontal, 20)
-
-            VStack(alignment: .leading, spacing: 0) {
-                if let info = systemInfo {
-                    InfoRow(label: "Version", value: info.version)
-                    InfoRow(label: "OS", value: info.os)
-                    InfoRow(label: "Kernel", value: info.kernel)
-                    InfoRow(label: "Architecture", value: info.arch)
-                    InfoRow(label: "Running Containers", value: "\(info.containersRunning)")
-                    InfoRow(label: "Stopped Containers", value: "\(info.containersStopped)")
-                    InfoRow(label: "Images", value: "\(info.images)")
-                } else {
-                    Text("Loading...")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .padding(.horizontal, 20)
-        }
-    }
-
-    // MARK: - Activity Section
+    // MARK: - Recent Containers
 
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Containers")
+            Text(language.localized("Recent Containers"))
                 .font(.system(size: 15, weight: .semibold))
                 .padding(.horizontal, 20)
 
@@ -148,7 +177,7 @@ struct MonitorView: View {
                     SwiftUI.Image(systemName: "shippingbox")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("No containers")
+                    Text(language.localized("No containers"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -197,25 +226,30 @@ struct MonitorView: View {
 
     // MARK: - Actions
 
-    private func loadDashboard() async {
-        isLoading = true
+    private func loadDashboard(showLoading: Bool = true) async {
+        if showLoading {
+            isLoading = true
+        }
         errorMessage = nil
-
         do {
             async let systemInfoTask = cliBackend.getSystemInfo()
             async let containersTask = cliBackend.listContainers(all: true)
             async let imagesTask = cliBackend.listImages()
+            async let volumesTask = cliBackend.listVolumes()
             async let networksTask = cliBackend.listNetworks()
-
+            async let machinesTask = cliBackend.listMachines()
             systemInfo = try await systemInfoTask
             containers = try await containersTask
             images = try await imagesTask
+            volumes = try await volumesTask
             networks = try await networksTask
+            machines = try await machinesTask
         } catch {
             errorMessage = error.localizedDescription
         }
-
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
     }
 }
 
@@ -247,7 +281,7 @@ private struct StatCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 180, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))

@@ -3,6 +3,7 @@ import SwiftUI
 struct ImageRowView: View {
     let image: Image
     let isSelected: Bool
+    let isPending: Bool
     let usageSummary: String?
     let isDangling: Bool
     let onDelete: () -> Void
@@ -17,6 +18,7 @@ struct ImageRowView: View {
     init(
         image: Image,
         isSelected: Bool = false,
+        isPending: Bool = false,
         usageSummary: String? = nil,
         isDangling: Bool = false,
         onDelete: @escaping () -> Void,
@@ -28,6 +30,7 @@ struct ImageRowView: View {
     ) {
         self.image = image
         self.isSelected = isSelected
+        self.isPending = isPending
         self.usageSummary = usageSummary
         self.isDangling = isDangling
         self.onDelete = onDelete
@@ -57,11 +60,19 @@ struct ImageRowView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                IconButton(systemName: "trash", action: onDelete, tooltip: "Delete")
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+            Group {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 24, height: 24)
+                } else {
+                    HStack(spacing: 4) {
+                        IconButton(systemName: "trash", action: onDelete, tooltip: "Delete")
+                            .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+                    }
+                }
             }
-            .opacity(isHovered || isSelected ? 1 : 0)
+            .opacity(isPending || isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -82,6 +93,7 @@ struct ImageRowView: View {
                 onSave: onSave ?? {}
             )
         }
+        .disabled(isPending)
     }
 
     private var imageBadge: some View {

@@ -5,11 +5,16 @@ struct PullImageSheet: View {
     @State private var imageName = ""
     @State private var isPulling = false
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Form {
-            Section("Image") {
-                TextField("Image name (e.g., nginx:latest)", text: $imageName)
+            Section(language.localized("Image")) {
+                TextField(language.localized("Image name (e.g., nginx:latest)"), text: $imageName)
                     .textFieldStyle(.roundedBorder)
             }
 
@@ -17,7 +22,7 @@ struct PullImageSheet: View {
                 HStack {
                     SwiftUI.Image(systemName: "info.circle")
                         .foregroundStyle(.secondary)
-                    Text("Enter the full image name including tag (e.g., nginx:latest)")
+                    Text(language.localized("Enter the full image name including tag (e.g., nginx:latest)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -25,10 +30,10 @@ struct PullImageSheet: View {
         }
         .formStyle(.grouped)
         .frame(minWidth: 400, minHeight: 180)
-        .navigationTitle("Pull Image")
+        .navigationTitle(language.localized("Pull Image"))
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
+                Button(language.localized("Cancel")) {
                     dismiss()
                 }
             }
@@ -45,7 +50,7 @@ struct PullImageSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Text("Pull")
+                        Text(language.localized("Pull"))
                     }
                 }
                 .disabled(imageName.isEmpty || isPulling)

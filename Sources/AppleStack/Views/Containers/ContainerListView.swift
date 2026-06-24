@@ -7,14 +7,19 @@ struct ContainerListView: View {
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
     @State private var containerToDelete: Container?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                title: "Containers",
-                subtitle: "\(viewModel.containers.filter { $0.state == .running }.count) running",
+                title: language.localized("Containers"),
+                subtitle: "\(viewModel.containers.filter { $0.state == .running }.count) \(language.localized("running"))",
                 leadingAccessory: nil,
-                leadingInset: 0
+                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
             ) {
                 headerActions
             }
@@ -27,7 +32,7 @@ struct ContainerListView: View {
                     SwiftUI.Image(systemName: "cube.box")
                         .font(.system(size: 52))
                         .foregroundStyle(.tertiary)
-                    Text("No containers")
+                    Text(language.localized("No containers"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -40,6 +45,7 @@ struct ContainerListView: View {
                             ContainerRowView(
                                 container: container,
                                 isSelected: selectedContainer?.id == container.id,
+                                isPending: viewModel.isPending(container),
                                 onStart: { Task { await viewModel.start(container) } },
                                 onStop: { Task { await viewModel.stop(container) } },
                                 onDelete: { containerToDelete = container },
@@ -73,7 +79,7 @@ struct ContainerListView: View {
             CreateContainerSheet(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.showInspectSheet) {
-            InspectOutputSheet(title: "Container Inspect", output: viewModel.inspectOutput)
+            InspectOutputSheet(title: language.localized("Container Inspect"), output: viewModel.inspectOutput)
         }
         .sheet(isPresented: $viewModel.showCopySheet) {
             CopyPathSheet(viewModel: viewModel)
@@ -82,15 +88,15 @@ struct ContainerListView: View {
             get: { viewModel.showError },
             set: { viewModel.showError = $0 }
         )) {
-            Button("OK") {
+            Button(language.localized("OK")) {
                 viewModel.showError = false
             }
             if viewModel.errorMessage != nil {
-                Button("Retry") {
+                Button(language.localized("Retry")) {
                     viewModel.showError = false
                     Task { await viewModel.loadContainers() }
                 }
-                Button("Start System") {
+                Button(language.localized("Start System")) {
                     viewModel.showError = false
                     Task {
                         try? await CLIBackend().systemStart()
@@ -110,17 +116,17 @@ struct ContainerListView: View {
                 set: { if !$0 { containerToDelete = nil } }
             )
         ) {
-            Button("Delete", role: .destructive) {
+            Button(language.localized("Delete"), role: .destructive) {
                 if let c = containerToDelete {
                     Task { await viewModel.delete(c) }
                 }
                 containerToDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(language.localized("Cancel"), role: .cancel) {
                 containerToDelete = nil
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(language.localized("This action cannot be undone."))
         }
         .task {
             await viewModel.loadContainers()
@@ -181,24 +187,24 @@ struct ContainerListView: View {
         HeaderCircleButton(
             systemName: "plus",
             action: { viewModel.showCreateSheet = true },
-            helpText: "New Container"
+            helpText: language.localized("New Container")
         )
     }
 
     private var overflowMenu: some View {
-        HeaderMenuButton(helpText: "More actions") {
+        HeaderMenuButton(helpText: language.localized("More actions")) {
             searchMenuActions
         }
     }
 
     private var searchMenuActions: some View {
         Group {
-            Button(isSearchExpanded ? "Hide Search" : "Search") {
+            Button(isSearchExpanded ? language.localized("Hide Search") : language.localized("Search")) {
                 isSearchExpanded.toggle()
             }
 
             if !viewModel.searchText.isEmpty {
-                Button("Clear Search") {
+                Button(language.localized("Clear Search")) {
                     viewModel.searchText = ""
                 }
             }
@@ -209,7 +215,7 @@ struct ContainerListView: View {
         HeaderSearchToggle(
             text: $viewModel.searchText,
             isExpanded: $isSearchExpanded,
-            placeholder: "Search",
+            placeholder: language.localized("Search"),
             width: width
         )
     }
@@ -218,22 +224,27 @@ struct ContainerListView: View {
 private struct CopyPathSheet: View {
     @Bindable var viewModel: ContainerListViewModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Form {
-            Section("Copy Files") {
-                TextField("Source (container:path or local path)", text: $viewModel.copySource)
-                TextField("Destination (container:path or local path)", text: $viewModel.copyDestination)
+            Section(language.localized("Copy Files")) {
+                TextField(language.localized("Source (container:path or local path)"), text: $viewModel.copySource)
+                TextField(language.localized("Destination (container:path or local path)"), text: $viewModel.copyDestination)
             }
         }
         .formStyle(.grouped)
         .frame(minWidth: 480, minHeight: 180)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { dismiss() }
+                Button(language.localized("Cancel")) { dismiss() }
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Copy") {
+                Button(language.localized("Copy")) {
                     Task { await viewModel.copyPath() }
                 }
                 .disabled(viewModel.copySource.isEmpty || viewModel.copyDestination.isEmpty)

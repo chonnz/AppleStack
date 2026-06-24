@@ -90,15 +90,20 @@ struct InspectorKeyValueItem {
 
 struct InspectorKeyValueTable: View {
     let items: [InspectorKeyValueItem]
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Key")
+                Text(language.localized("Key"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("Value")
+                Text(language.localized("Value"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
             }

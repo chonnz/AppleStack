@@ -7,14 +7,19 @@ struct ImageListView: View {
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
     @State private var imageToDelete: Image?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                title: "Images",
-                subtitle: viewModel.headerSubtitle,
+                title: language.localized("Images"),
+                subtitle: imageHeaderSubtitle,
                 leadingAccessory: nil,
-                leadingInset: 0
+                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
             ) {
                 headerActions
             }
@@ -27,7 +32,7 @@ struct ImageListView: View {
                     SwiftUI.Image(systemName: "square.3.layers.3d.down.right")
                         .font(.system(size: 52))
                         .foregroundStyle(.tertiary)
-                    Text("No images")
+                    Text(language.localized("No images"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -37,7 +42,7 @@ struct ImageListView: View {
                     LazyVStack(spacing: 2) {
                         ForEach(viewModel.groupedImages) { group in
                             HStack {
-                                Text(group.title)
+                                Text(language.localized(group.title))
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(.secondary)
                                 Spacer()
@@ -53,6 +58,7 @@ struct ImageListView: View {
                                 ImageRowView(
                                     image: image,
                                     isSelected: selectedImage?.id == image.id,
+                                    isPending: viewModel.isPending(image),
                                     usageSummary: viewModel.usageSummary(for: image),
                                     isDangling: viewModel.isDanglingImage(image),
                                     onDelete: { imageToDelete = image },
@@ -85,7 +91,7 @@ struct ImageListView: View {
             PullImageSheet(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.showInspectSheet) {
-            InspectOutputSheet(title: "Image Inspect", output: viewModel.inspectOutput)
+            InspectOutputSheet(title: language.localized("Image Inspect"), output: viewModel.inspectOutput)
         }
         .sheet(isPresented: $viewModel.showTagSheet) {
             TagImageSheet(viewModel: viewModel)
@@ -100,17 +106,17 @@ struct ImageListView: View {
                 set: { if !$0 { imageToDelete = nil } }
             )
         ) {
-            Button("Delete", role: .destructive) {
+            Button(language.localized("Delete"), role: .destructive) {
                 if let img = imageToDelete {
                     Task { await viewModel.deleteImage(img) }
                 }
                 imageToDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(language.localized("Cancel"), role: .cancel) {
                 imageToDelete = nil
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(language.localized("This action cannot be undone."))
         }
         .sheet(isPresented: $viewModel.showBuildSheet) {
             BuildImageSheet(viewModel: viewModel)
@@ -119,15 +125,15 @@ struct ImageListView: View {
             get: { viewModel.showError },
             set: { viewModel.showError = $0 }
         )) {
-            Button("OK") {
+            Button(language.localized("OK")) {
                 viewModel.showError = false
             }
             if viewModel.errorMessage != nil {
-                Button("Retry") {
+                Button(language.localized("Retry")) {
                     viewModel.showError = false
                     Task { await viewModel.loadImages() }
                 }
-                Button("Start System") {
+                Button(language.localized("Start System")) {
                     viewModel.showError = false
                     Task {
                         try? await CLIBackend().systemStart()
@@ -143,6 +149,12 @@ struct ImageListView: View {
         .task {
             await viewModel.loadImages()
         }
+    }
+
+    private var imageHeaderSubtitle: String {
+        viewModel.images.isEmpty
+            ? "0 \(language.localized("items"))"
+            : "\(viewModel.totalSizeFormatted) \(language.localized("total"))"
     }
 
     private func loadImage() {
@@ -201,50 +213,43 @@ struct ImageListView: View {
     }
 
     private var buildButton: some View {
-        HeaderCircleButton(
-            systemName: "hammer",
-            action: { buildImage() },
-            helpText: "Build image"
-        )
+        HeaderCircleButton(systemName: viewModel.isOperationRunning ? "hourglass" : "hammer", action: { buildImage() }, helpText: language.localized("Build image"))
+            .disabled(viewModel.isOperationRunning)
     }
 
     private var loadButton: some View {
-        HeaderCircleButton(
-            systemName: "tray.and.arrow.down",
-            action: { loadImage() },
-            helpText: "Load image archive"
-        )
+        HeaderCircleButton(systemName: viewModel.isOperationRunning ? "hourglass" : "tray.and.arrow.down", action: { loadImage() }, helpText: language.localized("Load image archive"))
+            .disabled(viewModel.isOperationRunning)
     }
 
     private var pullButton: some View {
-        HeaderCircleButton(
-            systemName: "plus",
-            action: { viewModel.showPullSheet = true },
-            helpText: "Pull Image"
-        )
+        HeaderCircleButton(systemName: viewModel.isOperationRunning ? "hourglass" : "plus", action: { viewModel.showPullSheet = true }, helpText: language.localized("Pull Image"))
+            .disabled(viewModel.isOperationRunning)
     }
 
     private var overflowMenu: some View {
-        HeaderMenuButton(helpText: "More actions") {
+        HeaderMenuButton(helpText: language.localized("More actions")) {
             searchMenuActions
             Divider()
-            Button("Build Image") {
+            Button(language.localized("Build Image")) {
                 buildImage()
             }
-            Button("Load Image Archive") {
+            .disabled(viewModel.isOperationRunning)
+            Button(language.localized("Load Image Archive")) {
                 loadImage()
             }
+            .disabled(viewModel.isOperationRunning)
         }
     }
 
     private var searchMenuActions: some View {
         Group {
-            Button(isSearchExpanded ? "Hide Search" : "Search") {
+            Button(isSearchExpanded ? language.localized("Hide Search") : language.localized("Search")) {
                 isSearchExpanded.toggle()
             }
 
             if !viewModel.searchText.isEmpty {
-                Button("Clear Search") {
+                Button(language.localized("Clear Search")) {
                     viewModel.searchText = ""
                 }
             }
@@ -255,7 +260,7 @@ struct ImageListView: View {
         HeaderSearchToggle(
             text: $viewModel.searchText,
             isExpanded: $isSearchExpanded,
-            placeholder: "Search",
+            placeholder: language.localized("Search"),
             width: width
         )
     }
@@ -264,19 +269,24 @@ struct ImageListView: View {
 private struct TagImageSheet: View {
     @Bindable var viewModel: ImageListViewModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Form {
-            Section("Tag Image") {
-                TextField("Target reference", text: $viewModel.tagTarget)
+            Section(language.localized("Tag Image")) {
+                TextField(language.localized("Target reference"), text: $viewModel.tagTarget)
             }
         }
         .formStyle(.grouped)
         .frame(minWidth: 420, minHeight: 140)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(language.localized("Cancel")) { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Tag") { Task { await viewModel.tagSelectedImage() } }
+                Button(language.localized("Tag")) { Task { await viewModel.tagSelectedImage() } }
                     .disabled(viewModel.tagTarget.isEmpty)
             }
         }
@@ -286,19 +296,24 @@ private struct TagImageSheet: View {
 private struct PushImageSheet: View {
     @Bindable var viewModel: ImageListViewModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Form {
-            Section("Push Image") {
-                TextField("Platform (optional, e.g. linux/arm64)", text: $viewModel.pushPlatform)
+            Section(language.localized("Push Image")) {
+                TextField(language.localized("Platform (optional, e.g. linux/arm64)"), text: $viewModel.pushPlatform)
             }
         }
         .formStyle(.grouped)
         .frame(minWidth: 420, minHeight: 140)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(language.localized("Cancel")) { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Push") { Task { await viewModel.pushSelectedImage() } }
+                Button(language.localized("Push")) { Task { await viewModel.pushSelectedImage() } }
             }
         }
     }
@@ -307,6 +322,11 @@ private struct PushImageSheet: View {
 private struct BuildImageSheet: View {
     @Bindable var viewModel: ImageListViewModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     private let machineStarterTemplate = """
     FROM ubuntu:24.04
@@ -329,33 +349,33 @@ private struct BuildImageSheet: View {
 
     var body: some View {
         Form {
-            Section("Build Image") {
-                TextField("Context directory", text: $viewModel.buildContext)
-                TextField("Dockerfile/Containerfile path", text: $viewModel.buildFile)
-                TextField("Tag", text: $viewModel.buildTag)
-                TextField("Platform (optional)", text: $viewModel.buildPlatform)
-                TextField("DNS nameserver (optional)", text: $viewModel.buildDNS)
+            Section(language.localized("Build Image")) {
+                TextField(language.localized("Context directory"), text: $viewModel.buildContext)
+                TextField(language.localized("Dockerfile/Containerfile path"), text: $viewModel.buildFile)
+                TextField(language.localized("Tag"), text: $viewModel.buildTag)
+                TextField(language.localized("Platform (optional)"), text: $viewModel.buildPlatform)
+                TextField(language.localized("DNS nameserver (optional)"), text: $viewModel.buildDNS)
             }
 
             Section {
-                Text("For `container machine`, prefer building a custom image instead of using a generic distro tag directly.")
+                Text(language.localized("For `container machine`, prefer building a custom image instead of using a generic distro tag directly."))
                     .foregroundStyle(.secondary)
-                Text("The image should provide `/sbin/init` at the root. If your build installs packages with `apt` or similar tools, configuring DNS can help avoid network resolution failures during build.")
+                Text(language.localized("The image should provide `/sbin/init` at the root. If your build installs packages with `apt` or similar tools, configuring DNS can help avoid network resolution failures during build."))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
 
-                Button("Use Machine Build Defaults") {
+                Button(language.localized("Use Machine Build Defaults")) {
                     viewModel.applyMachineBuildDefaults()
                 }
                 .buttonStyle(.bordered)
             } header: {
-                Text("Machine-Compatible Images")
+                Text(language.localized("Machine-Compatible Images"))
             } footer: {
-                Text("Recommended workflow from the tutorial: build a machine-oriented image first, then use that resulting image reference in the Machines view.")
+                Text(language.localized("Recommended workflow from the tutorial: build a machine-oriented image first, then use that resulting image reference in the Machines view."))
             }
 
             Section {
-                Text("Starter Containerfile")
+                Text(language.localized("Starter Containerfile"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -368,15 +388,15 @@ private struct BuildImageSheet: View {
                 }
                 .frame(minHeight: 180, maxHeight: 220)
             } footer: {
-                Text("Starter example based on the tutorial's machine-image requirements: use a base image with `/sbin/init`, reset machine-id files, and boot to a non-GUI target. Save this as `Containerfile`, then build it from the Images view.")
+                Text(language.localized("Starter example based on the tutorial's machine-image requirements: use a base image with `/sbin/init`, reset machine-id files, and boot to a non-GUI target. Save this as `Containerfile`, then build it from the Images view."))
             }
         }
         .formStyle(.grouped)
         .frame(minWidth: 560, minHeight: 520)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            ToolbarItem(placement: .cancellationAction) { Button(language.localized("Cancel")) { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Build") { Task { await viewModel.buildImage() } }
+                Button(language.localized("Build")) { Task { await viewModel.buildImage() } }
                     .disabled(viewModel.buildContext.isEmpty)
             }
         }

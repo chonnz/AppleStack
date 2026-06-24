@@ -15,16 +15,23 @@ struct VolumeListView: View {
     @State private var searchText = ""
     @State private var isSearchExpanded = false
     @State private var volumeToDelete: String?
+    @State private var pendingVolumes: Set<String> = []
+    @State private var isVolumeActionRunning = false
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                title: "Volumes",
-                subtitle: "\(volumes.count) volumes",
+                title: language.localized("Volumes"),
+                subtitle: "\(volumes.count) \(language.localized("volumes"))",
                 leadingAccessory: nil,
-                leadingInset: 0
+                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
             ) {
                 headerActions
             }
@@ -41,7 +48,7 @@ struct VolumeListView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadVolumes() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -53,7 +60,7 @@ struct VolumeListView: View {
                     SwiftUI.Image(systemName: "externaldrive")
                         .font(.system(size: 52))
                         .foregroundStyle(.tertiary)
-                    Text("No volumes")
+                    Text(language.localized("No volumes"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -63,7 +70,7 @@ struct VolumeListView: View {
                     SwiftUI.Image(systemName: "magnifyingglass")
                         .font(.system(size: 40))
                         .foregroundStyle(.tertiary)
-                    Text("No matching volumes")
+                    Text(language.localized("No matching volumes"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -75,6 +82,8 @@ struct VolumeListView: View {
                             VolumeRowView(
                                 volume: volume,
                                 isSelected: selectedVolume == volume,
+                                isPending: pendingVolumes.contains(volume),
+                                language: language,
                                 onDelete: { volumeToDelete = volume },
                                 onInspect: { Task { await inspectVolume(volume) } }
                             )
@@ -99,17 +108,17 @@ struct VolumeListView: View {
                 set: { if !$0 { volumeToDelete = nil } }
             )
         ) {
-            Button("Delete", role: .destructive) {
+            Button(language.localized("Delete"), role: .destructive) {
                 if let v = volumeToDelete {
                     deleteVolume(v)
                 }
                 volumeToDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(language.localized("Cancel"), role: .cancel) {
                 volumeToDelete = nil
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(language.localized("This action cannot be undone."))
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
@@ -126,21 +135,21 @@ struct VolumeListView: View {
 
     private var createVolumeSheet: some View {
         Form {
-            Section("Create Volume") {
-                TextField("Volume name", text: $newVolumeName)
+            Section(language.localized("Create Volume")) {
+                TextField(language.localized("Volume name"), text: $newVolumeName)
             }
         }
         .formStyle(.grouped)
         .frame(width: 400, height: 140)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
+                Button(language.localized("Cancel")) {
                     showCreateSheet = false
                     newVolumeName = ""
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Create") {
+                Button(language.localized("Create")) {
                     createVolume(newVolumeName)
                     showCreateSheet = false
                     newVolumeName = ""
@@ -152,42 +161,59 @@ struct VolumeListView: View {
 
     // MARK: - Actions
 
-    private func loadVolumes() async {
-        isLoading = true
+    private func loadVolumes(showLoading: Bool = true) async {
+        if showLoading {
+            isLoading = true
+        }
         errorMessage = nil
         do {
             volumes = try await cliBackend.listVolumes()
         } catch {
             errorMessage = error.localizedDescription
         }
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
     }
 
     private func createVolume(_ name: String) {
         Task {
+            guard !isVolumeActionRunning else { return }
+            isVolumeActionRunning = true
+            defer { isVolumeActionRunning = false }
             do {
                 try await cliBackend.createVolume(name: name)
-                await loadVolumes()
+                try await waitForVolume(name) { $0 }
+                await loadVolumes(showLoading: false)
             } catch {
                 errorMessage = error.localizedDescription
+                await loadVolumes(showLoading: false)
             }
         }
     }
 
     private func deleteVolume(_ name: String) {
         Task {
+            guard !pendingVolumes.contains(name) else { return }
+            pendingVolumes.insert(name)
+            defer { pendingVolumes.remove(name) }
             do {
                 try await cliBackend.removeVolume(name: name)
-                await loadVolumes()
+                try await waitForVolume(name) { !$0 }
+                if selectedVolume == name {
+                    selectedVolume = nil
+                }
+                await loadVolumes(showLoading: false)
             } catch {
                 errorMessage = error.localizedDescription
+                await loadVolumes(showLoading: false)
             }
         }
     }
 
     private func inspectVolume(_ name: String) async {
         do {
-            outputTitle = "Volume Inspect"
+            outputTitle = language.localized("Volume Inspect")
             outputText = try await cliBackend.inspectVolumes(names: [name])
             showOutputSheet = true
         } catch {
@@ -196,11 +222,31 @@ struct VolumeListView: View {
     }
 
     private func pruneVolumes() async {
+        guard !isVolumeActionRunning else { return }
+        isVolumeActionRunning = true
+        defer { isVolumeActionRunning = false }
         do {
             try await cliBackend.pruneVolumes()
-            await loadVolumes()
+            await loadVolumes(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadVolumes(showLoading: false)
+        }
+    }
+
+    private func waitForVolume(
+        _ name: String,
+        timeoutSeconds: Double = 30,
+        matches: (Bool) -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            let latest = try await cliBackend.listVolumes()
+            volumes = latest
+            if matches(latest.contains(name)) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(500))
         }
     }
 
@@ -238,25 +284,27 @@ struct VolumeListView: View {
 
     private var newVolumeButton: some View {
         HeaderCircleButton(
-            systemName: "plus",
+            systemName: isVolumeActionRunning ? "hourglass" : "plus",
             action: { showCreateSheet = true },
-            helpText: "New Volume"
+            helpText: language.localized("New Volume")
         )
+        .disabled(isVolumeActionRunning)
     }
 
     private var pruneButton: some View {
         HeaderCircleButton(
-            systemName: "trash",
+            systemName: isVolumeActionRunning ? "hourglass" : "trash",
             action: { Task { await pruneVolumes() } },
-            helpText: "Prune volumes"
+            helpText: language.localized("Prune volumes")
         )
+        .disabled(isVolumeActionRunning)
     }
 
     private var overflowMenu: some View {
-        HeaderMenuButton(helpText: "More actions") {
+        HeaderMenuButton(helpText: language.localized("More actions")) {
             searchMenuActions
             Divider()
-            Button("Prune Volumes") {
+            Button(language.localized("Prune Volumes")) {
                 Task { await pruneVolumes() }
             }
         }
@@ -264,12 +312,12 @@ struct VolumeListView: View {
 
     private var searchMenuActions: some View {
         Group {
-            Button(isSearchExpanded ? "Hide Search" : "Search") {
+            Button(language.localized(isSearchExpanded ? "Hide Search" : "Search")) {
                 isSearchExpanded.toggle()
             }
 
             if !searchText.isEmpty {
-                Button("Clear Search") {
+                Button(language.localized("Clear Search")) {
                     searchText = ""
                 }
             }
@@ -280,7 +328,7 @@ struct VolumeListView: View {
         HeaderSearchToggle(
             text: $searchText,
             isExpanded: $isSearchExpanded,
-            placeholder: "Search",
+            placeholder: language.localized("Search"),
             width: width
         )
     }
@@ -289,6 +337,8 @@ struct VolumeListView: View {
 private struct VolumeRowView: View {
     let volume: String
     let isSelected: Bool
+    let isPending: Bool
+    let language: AppLanguage
     let onDelete: () -> Void
     let onInspect: () -> Void
 
@@ -314,26 +364,34 @@ private struct VolumeRowView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                Button(action: onInspect) {
-                    SwiftUI.Image(systemName: "info.circle")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
-                .help("Inspect volume")
+            Group {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 52, alignment: .trailing)
+                } else {
+                    HStack(spacing: 4) {
+                        Button(action: onInspect) {
+                            SwiftUI.Image(systemName: "info.circle")
+                                .font(.system(size: 13, weight: .medium))
+                                .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+                        .help(language.localized("Inspect volume"))
 
-                Button(action: onDelete) {
-                    SwiftUI.Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 24, height: 24)
+                        Button(action: onDelete) {
+                            SwiftUI.Image(systemName: "trash")
+                                .font(.system(size: 13, weight: .medium))
+                                .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+                        .help(language.localized("Delete volume"))
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
-                .help("Delete volume")
             }
-            .opacity(isHovered || isSelected ? 1 : 0)
+            .opacity(isPending || isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -344,15 +402,16 @@ private struct VolumeRowView: View {
             isHovered = hovering
         }
         .contextMenu {
-            Button("Inspect") {
+            Button(language.localized("Inspect")) {
                 onInspect()
             }
             Button(role: .destructive) {
                 onDelete()
             } label: {
-                Text("Delete")
+                Text(language.localized("Delete"))
             }
         }
+        .disabled(isPending)
     }
 
     private var rowBackground: some ShapeStyle {

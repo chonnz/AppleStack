@@ -8,6 +8,11 @@ struct ResourceChartView: View {
     let color: Color
     let currentValue: String
     var subtitle: String?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     private var minValue: Double {
         dataPoints.map(\.value).min() ?? 0
@@ -57,7 +62,7 @@ struct ResourceChartView: View {
             if dataPoints.isEmpty {
                 VStack {
                     Spacer()
-                    Text("No data yet")
+                    Text(language.localized("No data yet"))
                         .font(.system(size: 12))
                         .foregroundStyle(.tertiary)
                     Spacer()

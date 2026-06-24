@@ -3,10 +3,16 @@ import SwiftUI
 struct NetworkRowView: View {
     let network: Network
     let isSelected: Bool
+    let isPending: Bool
     let onDelete: () -> Void
     let onInspect: () -> Void
 
     @State private var isHovered = false
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -34,26 +40,34 @@ struct NetworkRowView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                Button(action: onInspect) {
-                    SwiftUI.Image(systemName: "info.circle")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 24, height: 24)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
-                .help("Inspect network")
+            Group {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 52, alignment: .trailing)
+                } else {
+                    HStack(spacing: 4) {
+                        Button(action: onInspect) {
+                            SwiftUI.Image(systemName: "info.circle")
+                                .font(.system(size: 13, weight: .medium))
+                                .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+                        .help(language.localized("Inspect network"))
 
-                Button(action: onDelete) {
-                    SwiftUI.Image(systemName: "trash")
-                        .font(.system(size: 13, weight: .medium))
-                        .frame(width: 24, height: 24)
+                        Button(action: onDelete) {
+                            SwiftUI.Image(systemName: "trash")
+                                .font(.system(size: 13, weight: .medium))
+                                .frame(width: 24, height: 24)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
+                        .help(language.localized("Delete network"))
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isSelected ? Color.white.opacity(0.92) : .secondary)
-                .help("Delete network")
             }
-            .opacity(isHovered || isSelected ? 1 : 0)
+            .opacity(isPending || isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -64,15 +78,16 @@ struct NetworkRowView: View {
             isHovered = hovering
         }
         .contextMenu {
-            Button("Inspect") {
+            Button(language.localized("Inspect")) {
                 onInspect()
             }
             Button(role: .destructive) {
                 onDelete()
             } label: {
-                Text("Delete")
+                Text(language.localized("Delete"))
             }
         }
+        .disabled(isPending)
     }
 
     private var rowBackground: some ShapeStyle {
@@ -108,6 +123,7 @@ struct NetworkRowView: View {
             containers: 3
         ),
         isSelected: true,
+        isPending: false,
         onDelete: {},
         onInspect: {}
     )

@@ -15,16 +15,23 @@ struct NetworkListView: View {
     @State private var searchText = ""
     @State private var isSearchExpanded = false
     @State private var networkToDelete: Network?
+    @State private var pendingNetworkIDs: Set<String> = []
+    @State private var isNetworkActionRunning = false
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                title: "Networks",
-                subtitle: "\(networks.count) networks",
+                title: language.localized("Networks"),
+                subtitle: "\(networks.count) \(language.localized("networks"))",
                 leadingAccessory: nil,
-                leadingInset: 0
+                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
             ) {
                 headerActions
             }
@@ -41,7 +48,7 @@ struct NetworkListView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadNetworks() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -53,7 +60,7 @@ struct NetworkListView: View {
                     SwiftUI.Image(systemName: "network")
                         .font(.system(size: 52))
                         .foregroundStyle(.tertiary)
-                    Text("No networks")
+                    Text(language.localized("No networks"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -63,7 +70,7 @@ struct NetworkListView: View {
                     SwiftUI.Image(systemName: "magnifyingglass")
                         .font(.system(size: 40))
                         .foregroundStyle(.tertiary)
-                    Text("No matching networks")
+                    Text(language.localized("No matching networks"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -75,6 +82,7 @@ struct NetworkListView: View {
                             NetworkRowView(
                                 network: network,
                                 isSelected: selectedNetwork?.id == network.id,
+                                isPending: pendingNetworkIDs.contains(network.id),
                                 onDelete: { networkToDelete = network },
                                 onInspect: { Task { await inspectNetwork(network) } }
                             )
@@ -99,17 +107,17 @@ struct NetworkListView: View {
                 set: { if !$0 { networkToDelete = nil } }
             )
         ) {
-            Button("Delete", role: .destructive) {
+            Button(language.localized("Delete"), role: .destructive) {
                 if let n = networkToDelete {
                     Task { await deleteNetwork(n) }
                 }
                 networkToDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(language.localized("Cancel"), role: .cancel) {
                 networkToDelete = nil
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(language.localized("This action cannot be undone."))
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
@@ -131,36 +139,36 @@ struct NetworkListView: View {
     private var createNetworkSheet: some View {
         NavigationStack {
             Form {
-                Section("Basic Settings") {
-                    TextField("Network Name", text: $newNetwork.name)
-                    Picker("Driver", selection: $newNetwork.driver) {
+                Section(language.localized("Basic Settings")) {
+                    TextField(language.localized("Network Name"), text: $newNetwork.name)
+                    Picker(language.localized("Driver"), selection: $newNetwork.driver) {
                         Text("bridge").tag("bridge")
                         Text("host").tag("host")
                         Text("none").tag("none")
                     }
                 }
 
-                Section("IPAM Configuration") {
-                    TextField("Subnet (e.g., 172.20.0.0/16)", text: $newNetwork.subnet)
-                    TextField("Gateway (e.g., 172.20.0.1)", text: $newNetwork.gateway)
+                Section(language.localized("IPAM Configuration")) {
+                    TextField(language.localized("Subnet (e.g., 172.20.0.0/16)"), text: $newNetwork.subnet)
+                    TextField(language.localized("Gateway (e.g., 172.20.0.1)"), text: $newNetwork.gateway)
                 }
 
-                Section("Options") {
-                    Toggle("Internal network", isOn: $newNetwork.isInternal)
+                Section(language.localized("Options")) {
+                    Toggle(language.localized("Internal network"), isOn: $newNetwork.isInternal)
                 }
             }
             .formStyle(.grouped)
             .frame(minWidth: 400, minHeight: 350)
-            .navigationTitle("Create Network")
+            .navigationTitle(language.localized("Create Network"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button(language.localized("Cancel")) {
                         showCreateSheet = false
                         newNetwork = NetworkConfig()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
+                    Button(language.localized("Create")) {
                         Task {
                             await createNetwork(newNetwork)
                             showCreateSheet = false
@@ -175,41 +183,55 @@ struct NetworkListView: View {
 
     // MARK: - Actions
 
-    private func loadNetworks() async {
-        isLoading = true
+    private func loadNetworks(showLoading: Bool = true) async {
+        if showLoading {
+            isLoading = true
+        }
         errorMessage = nil
         do {
             networks = try await cliBackend.listNetworks()
         } catch {
             errorMessage = error.localizedDescription
         }
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
     }
 
     private func createNetwork(_ config: NetworkConfig) async {
+        guard !isNetworkActionRunning else { return }
+        isNetworkActionRunning = true
+        defer { isNetworkActionRunning = false }
         do {
             try await cliBackend.createNetwork(config: config)
-            await loadNetworks()
+            try await waitForNetwork(id: config.name) { $0 != nil }
+            await loadNetworks(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadNetworks(showLoading: false)
         }
     }
 
     private func deleteNetwork(_ network: Network) async {
+        guard !pendingNetworkIDs.contains(network.id) else { return }
+        pendingNetworkIDs.insert(network.id)
+        defer { pendingNetworkIDs.remove(network.id) }
         do {
             try await cliBackend.removeNetwork(id: network.id)
+            try await waitForNetwork(id: network.id) { $0 == nil }
             if selectedNetwork?.id == network.id {
                 selectedNetwork = nil
             }
-            await loadNetworks()
+            await loadNetworks(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadNetworks(showLoading: false)
         }
     }
 
     private func inspectNetwork(_ network: Network) async {
         do {
-            outputTitle = "Network Inspect"
+            outputTitle = language.localized("Network Inspect")
             outputText = try await cliBackend.inspectNetworks(ids: [network.id])
             showOutputSheet = true
         } catch {
@@ -218,11 +240,31 @@ struct NetworkListView: View {
     }
 
     private func pruneNetworks() async {
+        guard !isNetworkActionRunning else { return }
+        isNetworkActionRunning = true
+        defer { isNetworkActionRunning = false }
         do {
             try await cliBackend.pruneNetworks()
-            await loadNetworks()
+            await loadNetworks(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadNetworks(showLoading: false)
+        }
+    }
+
+    private func waitForNetwork(
+        id: String,
+        timeoutSeconds: Double = 30,
+        matches: (Network?) -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            let latest = try await cliBackend.listNetworks()
+            networks = latest
+            if matches(latest.first(where: { $0.id == id || $0.name == id })) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(500))
         }
     }
 
@@ -260,25 +302,27 @@ struct NetworkListView: View {
 
     private var newNetworkButton: some View {
         HeaderCircleButton(
-            systemName: "plus",
+            systemName: isNetworkActionRunning ? "hourglass" : "plus",
             action: { showCreateSheet = true },
-            helpText: "New Network"
+            helpText: language.localized("New Network")
         )
+        .disabled(isNetworkActionRunning)
     }
 
     private var pruneButton: some View {
         HeaderCircleButton(
-            systemName: "trash",
+            systemName: isNetworkActionRunning ? "hourglass" : "trash",
             action: { Task { await pruneNetworks() } },
-            helpText: "Prune networks"
+            helpText: language.localized("Prune networks")
         )
+        .disabled(isNetworkActionRunning)
     }
 
     private var overflowMenu: some View {
-        HeaderMenuButton(helpText: "More actions") {
+        HeaderMenuButton(helpText: language.localized("More actions")) {
             searchMenuActions
             Divider()
-            Button("Prune Networks") {
+            Button(language.localized("Prune Networks")) {
                 Task { await pruneNetworks() }
             }
         }
@@ -286,12 +330,12 @@ struct NetworkListView: View {
 
     private var searchMenuActions: some View {
         Group {
-            Button(isSearchExpanded ? "Hide Search" : "Search") {
+            Button(language.localized(isSearchExpanded ? "Hide Search" : "Search")) {
                 isSearchExpanded.toggle()
             }
 
             if !searchText.isEmpty {
-                Button("Clear Search") {
+                Button(language.localized("Clear Search")) {
                     searchText = ""
                 }
             }
@@ -302,7 +346,7 @@ struct NetworkListView: View {
         HeaderSearchToggle(
             text: $searchText,
             isExpanded: $isSearchExpanded,
-            placeholder: "Search",
+            placeholder: language.localized("Search"),
             width: width
         )
     }

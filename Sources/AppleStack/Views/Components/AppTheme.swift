@@ -7,6 +7,8 @@ enum ModuleTint {
     static let networks = Color(hex: "#2ECC71")
     static let machines = Color(hex: "#1ABC9C")
     static let registry = Color(hex: "#F39C12")
+    static let activityMonitor = Color(hex: "#E74C3C")
+    static let commands = Color(hex: "#16A085")
     static let builder = Color(hex: "#95A5A6")
     static let dashboard = Color(hex: "#E74C3C")
     static let system = Color(hex: "#7F8C8D")
@@ -32,7 +34,8 @@ enum AppTheme {
     static let terminalBackground = Color(nsColor: .textBackgroundColor)
     static let terminalSecondaryBackground = Color(nsColor: .controlBackgroundColor).opacity(0.72)
     static let terminalBorder = Color(nsColor: .separatorColor).opacity(0.38)
-    static let windowControlsClearance: CGFloat = 0
+    // 侧边栏折叠后，系统红绿灯和侧边栏按钮会占用左上角区域，标题需要像 OrbStack 一样向右避让。
+    static let windowControlsClearance: CGFloat = 142
 }
 
 struct PaneHeader<Actions: View>: View {
@@ -62,7 +65,6 @@ struct PaneHeader<Actions: View>: View {
             verticalHeader
         }
         .padding(.horizontal, 16)
-        .padding(.leading, leadingInset)
         .padding(.top, 12)
         .padding(.bottom, 10)
         .frame(minHeight: 60, alignment: .top)
@@ -81,6 +83,7 @@ struct PaneHeader<Actions: View>: View {
             titleBlock
                 .layoutPriority(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(x: leadingInset)
 
             Spacer(minLength: 12)
             actions
@@ -96,6 +99,7 @@ struct PaneHeader<Actions: View>: View {
 
                 titleBlock
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .offset(x: leadingInset)
             }
 
             HStack {

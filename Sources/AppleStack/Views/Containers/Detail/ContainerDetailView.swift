@@ -10,8 +10,19 @@ struct ContainerDetailView: View {
     @State private var isLoadingInfo = false
     @State private var infoErrorMessage: String?
     @State private var rawInspectOutput: String?
+    @State private var containerPath = "/"
+    @State private var localPath = ""
+    @State private var copyDirection: FileCopyDirection = .fromContainer
+    @State private var fileActionStatus: String?
+    @State private var isRunningFileAction = false
+    @State private var logSearchText = ""
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     init(container: Container, selectedTab: String = "Info") {
         self.container = container
@@ -36,6 +47,8 @@ struct ContainerDetailView: View {
                 logsView
             case "Terminal":
                 terminalView
+            case "Files":
+                filesView
             case "Stats":
                 statsView
             case "Inspect":
@@ -68,14 +81,14 @@ struct ContainerDetailView: View {
             } else if let details {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        InspectorSection(title: "Overview") {
+                        InspectorSection(title: language.localized("Overview")) {
                             InspectorCard {
                                 InspectorRows(rows: details.overviewRows)
                             }
                         }
 
                         if !details.portMappings.isEmpty {
-                            InspectorSection(title: "Published Ports") {
+                            InspectorSection(title: language.localized("Published Ports")) {
                                 InspectorCard {
                                     InspectorTagFlow(items: details.portMappings)
                                 }
@@ -83,7 +96,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.environment.isEmpty {
-                            InspectorSection(title: "Environment") {
+                            InspectorSection(title: language.localized("Environment")) {
                                 InspectorCard {
                                     InspectorKeyValueTable(items: details.environment)
                                 }
@@ -91,7 +104,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.labels.isEmpty {
-                            InspectorSection(title: "Labels") {
+                            InspectorSection(title: language.localized("Labels")) {
                                 InspectorCard {
                                     InspectorKeyValueTable(items: details.labels)
                                 }
@@ -99,7 +112,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.mounts.isEmpty {
-                            InspectorSection(title: "Mounts") {
+                            InspectorSection(title: language.localized("Mounts")) {
                                 InspectorCard {
                                     InspectorTagFlow(items: details.mounts)
                                 }
@@ -117,7 +130,7 @@ struct ContainerDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadDetails() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -139,7 +152,7 @@ struct ContainerDetailView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if !details.runtimeRows.isEmpty {
-                            InspectorSection(title: "Runtime") {
+                            InspectorSection(title: language.localized("Runtime")) {
                                 InspectorCard {
                                     InspectorRows(rows: details.runtimeRows)
                                 }
@@ -147,7 +160,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.environment.isEmpty {
-                            InspectorSection(title: "Environment") {
+                            InspectorSection(title: language.localized("Environment")) {
                                 InspectorCard {
                                     InspectorKeyValueTable(items: details.environment)
                                 }
@@ -155,7 +168,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.labels.isEmpty {
-                            InspectorSection(title: "Labels") {
+                            InspectorSection(title: language.localized("Labels")) {
                                 InspectorCard {
                                     InspectorKeyValueTable(items: details.labels)
                                 }
@@ -163,7 +176,7 @@ struct ContainerDetailView: View {
                         }
 
                         if !details.dnsRows.isEmpty {
-                            InspectorSection(title: "DNS") {
+                            InspectorSection(title: language.localized("DNS")) {
                                 InspectorCard {
                                     InspectorRows(rows: details.dnsRows)
                                 }
@@ -184,93 +197,54 @@ struct ContainerDetailView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let details {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        if !details.networkRows.isEmpty {
-                            InspectorSection(title: "Network") {
-                                InspectorCard {
-                                    InspectorRows(rows: details.networkRows)
-                                }
-                            }
-                        }
-
-                        if !details.portMappings.isEmpty {
-                            InspectorSection(title: "Published Ports") {
-                                InspectorCard {
-                                    InspectorTagFlow(items: details.portMappings)
-                                }
-                            }
-                        }
+                if details.networkRows.isEmpty && details.portMappings.isEmpty {
+                    VStack(spacing: 12) {
+                        SwiftUI.Image(systemName: "network")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                        Text(language.localized("No network information"))
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(16)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            if !details.networkRows.isEmpty {
+                                InspectorSection(title: language.localized("Network")) {
+                                    InspectorCard {
+                                        InspectorRows(rows: details.networkRows)
+                                    }
+                                }
+                            }
+
+                            if !details.portMappings.isEmpty {
+                                InspectorSection(title: language.localized("Published Ports")) {
+                                    InspectorCard {
+                                        InspectorTagFlow(items: details.portMappings)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(16)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
                 Color.clear
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Logs Tab
 
     private var logsView: some View {
         VStack(spacing: 0) {
-            // Toolbar
-            HStack(spacing: 12) {
-                Button {
-                    Task { @MainActor in
-                        await logViewModel.loadLogs()
-                    }
-                } label: {
-                    SwiftUI.Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-                .disabled(logViewModel.isLoading)
+            logsToolbar
 
-                Button {
-                    if logViewModel.isStreaming {
-                        logViewModel.stopStreaming()
-                    } else {
-                        logViewModel.startStreaming()
-                    }
-                } label: {
-                    SwiftUI.Image(systemName: logViewModel.isStreaming ? "stop.fill" : "play.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(logViewModel.isStreaming ? .red : .green)
-                }
-                .buttonStyle(.plain)
-
-                Toggle("Auto-scroll", isOn: $logViewModel.autoScroll)
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-
-                Spacer()
-
-                Button {
-                    logViewModel.clearLogs()
-                } label: {
-                    SwiftUI.Image(systemName: "trash")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    copyLogsToClipboard()
-                } label: {
-                    SwiftUI.Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color(nsColor: .controlBackgroundColor))
-
-            Divider()
-
-            // Log content
             if logViewModel.isLoading {
-                ProgressView("Loading logs...")
+                ProgressView(language.localized("Loading logs..."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = logViewModel.errorMessage {
                 VStack(spacing: 12) {
@@ -281,7 +255,7 @@ struct ContainerDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { @MainActor in
                             await logViewModel.loadLogs()
                         }
@@ -295,57 +269,206 @@ struct ContainerDetailView: View {
                     SwiftUI.Image(systemName: "doc.text")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
-                    Text("No logs")
+                    Text(language.localized("No logs"))
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 }
+                .background(Color(nsColor: .textBackgroundColor))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if filteredLogEntries.isEmpty {
+                VStack(spacing: 12) {
+                    SwiftUI.Image(systemName: "magnifyingglass")
+                        .font(.system(size: 38))
+                        .foregroundStyle(.tertiary)
+                    Text(language.localized("No matching logs"))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .background(Color(nsColor: .textBackgroundColor))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView([.horizontal, .vertical]) {
-                        LazyVStack(alignment: .leading, spacing: 2) {
-                            ForEach(logViewModel.logs) { entry in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text(entry.formattedTime)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundStyle(.tertiary)
-                                        .frame(width: 80, alignment: .leading)
-
-                                    Text(entry.content)
-                                        .font(.system(size: 12, design: .monospaced))
-                                        .textSelection(.enabled)
-                                }
-                                .id(entry.id)
-                            }
-                        }
-                        .padding(12)
-                    }
-                    .onChange(of: logViewModel.logs.count) { _, _ in
-                        if logViewModel.autoScroll, let lastLog = logViewModel.logs.last {
-                            withAnimation {
-                                proxy.scrollTo(lastLog.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
+                LogsConsoleTextView(text: filteredLogText, scrollsToBottom: logViewModel.autoScroll)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    private var logsToolbar: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                SwiftUI.Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                TextField(language.localized("Search"), text: $logSearchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+
+                if !logSearchText.isEmpty {
+                    Button {
+                        logSearchText = ""
+                    } label: {
+                        SwiftUI.Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            Spacer(minLength: 8)
+
+            logToolbarButton("arrow.clockwise", help: language.localized("Refresh logs")) {
+                Task { @MainActor in
+                    await logViewModel.loadLogs()
+                }
+            }
+            .disabled(logViewModel.isLoading)
+
+            logToolbarButton(logViewModel.isStreaming ? "stop.fill" : "play.fill", help: language.localized(logViewModel.isStreaming ? "Stop following logs" : "Follow logs")) {
+                if logViewModel.isStreaming {
+                    logViewModel.stopStreaming()
+                } else {
+                    logViewModel.startStreaming()
+                }
+            }
+            .foregroundStyle(logViewModel.isStreaming ? .red : .secondary)
+
+            logToolbarButton(logViewModel.autoScroll ? "arrow.down.to.line.compact" : "arrow.down.to.line", help: language.localized("Toggle auto-scroll")) {
+                logViewModel.autoScroll.toggle()
+            }
+            .foregroundStyle(logViewModel.autoScroll ? AppTheme.accentColor : .secondary)
+
+            logToolbarButton("doc.on.doc", help: language.localized("Copy logs")) {
+                copyLogsToClipboard()
+            }
+
+            logToolbarButton("trash", help: language.localized("Clear logs")) {
+                logViewModel.clearLogs()
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color(nsColor: .textBackgroundColor))
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    private func logToolbarButton(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            SwiftUI.Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
     }
 
     // MARK: - Terminal Tab
 
     private var terminalView: some View {
         NativeTerminalView(
-            sessionTitle: "Container Terminal",
+            sessionTitle: language.localized("Container Terminal"),
             sessionSubtitle: container.name,
             prompt: "\(container.name) %",
-            placeholder: "Enter shell command",
+            placeholder: language.localized("Enter shell command"),
             isAvailable: container.status == .running,
-            unavailableTitle: "Container is not running",
-            unavailableMessage: "Start the container to open a shell session.",
+            unavailableTitle: language.localized("Container is not running"),
+            unavailableMessage: language.localized("Start the container to open a shell session."),
             session: terminalSession
         )
+    }
+
+    // MARK: - Files Tab
+
+    private var filesView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                InspectorSection(title: language.localized("Copy Files")) {
+                    InspectorCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Picker(language.localized("Direction"), selection: $copyDirection) {
+                                Text(language.localized("Container to Mac")).tag(FileCopyDirection.fromContainer)
+                                Text(language.localized("Mac to Container")).tag(FileCopyDirection.toContainer)
+                            }
+                            .pickerStyle(.segmented)
+
+                            TextField(language.localized("Container path"), text: $containerPath)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+
+                            HStack(spacing: 8) {
+                                TextField(language.localized("Mac path"), text: $localPath)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 12, design: .monospaced))
+
+                                Button {
+                                    chooseLocalPath()
+                                } label: {
+                                    SwiftUI.Image(systemName: copyDirection == .fromContainer ? "folder.badge.plus" : "folder")
+                                }
+                                .buttonStyle(.bordered)
+                                .help(language.localized(copyDirection == .fromContainer ? "Choose output folder" : "Choose local file or folder"))
+                            }
+
+                            HStack {
+                                Button {
+                                    Task { await copyFiles() }
+                                } label: {
+                                    Label(language.localized("Copy"), systemImage: "doc.on.doc")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(!canCopyFiles || isRunningFileAction)
+
+                                Button {
+                                    exportContainer()
+                                } label: {
+                                    Label(language.localized("Export Filesystem"), systemImage: "square.and.arrow.up")
+                                }
+                                .buttonStyle(.bordered)
+
+                                if isRunningFileAction {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+
+                                Spacer()
+                            }
+
+                            if let fileActionStatus {
+                                Text(fileActionStatus)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+                }
+
+                InspectorSection(title: language.localized("Path Format")) {
+                    InspectorCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(String(format: language.localized("Container path uses `%@:/path`. Mac path is an absolute local path."), container.id))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            Text(language.localized("Apple container currently exposes copy/export operations through CLI. This view avoids pretending that random-access file browsing is available."))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .background(AppTheme.paneBackground)
     }
 
     private var inspectView: some View {
@@ -391,9 +514,155 @@ struct ContainerDetailView: View {
     }
 
     private func copyLogsToClipboard() {
-        let logs = logViewModel.exportLogs()
+        let logs = filteredLogEntries.map(\.content).joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(logs, forType: .string)
+    }
+
+    private var filteredLogEntries: [LogEntry] {
+        let query = logSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return logViewModel.logs }
+        return logViewModel.logs.filter { $0.content.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var filteredLogText: String {
+        filteredLogEntries.map(\.content).joined(separator: "\n")
+    }
+
+    private var canCopyFiles: Bool {
+        !containerPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func chooseLocalPath() {
+        switch copyDirection {
+        case .fromContainer:
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            if panel.runModal() == .OK, let url = panel.url {
+                localPath = url.path
+            }
+        case .toContainer:
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = true
+            panel.canChooseDirectories = true
+            if panel.runModal() == .OK, let url = panel.url {
+                localPath = url.path
+            }
+        }
+    }
+
+    private func copyFiles() async {
+        let cleanedContainerPath = containerPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedLocalPath = localPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedContainerPath.isEmpty, !cleanedLocalPath.isEmpty else { return }
+
+        isRunningFileAction = true
+        fileActionStatus = nil
+        defer { isRunningFileAction = false }
+
+        let containerReference = "\(container.id):\(cleanedContainerPath)"
+
+        do {
+            switch copyDirection {
+            case .fromContainer:
+                try await cliBackend.copyContainerPath(source: containerReference, destination: cleanedLocalPath)
+            case .toContainer:
+                try await cliBackend.copyContainerPath(source: cleanedLocalPath, destination: containerReference)
+            }
+            fileActionStatus = "Copy completed."
+        } catch {
+            fileActionStatus = error.localizedDescription
+        }
+    }
+
+    private func exportContainer() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "\(container.name).tar"
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                isRunningFileAction = true
+                defer { isRunningFileAction = false }
+                do {
+                    _ = try await cliBackend.exportContainer(id: container.id, outputPath: url.path)
+                    fileActionStatus = "Exported to \(url.path)."
+                } catch {
+                    fileActionStatus = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+private enum FileCopyDirection: String, Hashable {
+    case fromContainer
+    case toContainer
+}
+
+private struct LogsConsoleTextView: NSViewRepresentable {
+    let text: String
+    let scrollsToBottom: Bool
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.textColor = .labelColor
+        textView.textContainerInset = NSSize(width: 14, height: 10)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.isHorizontallyResizable = true
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.containerSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.usesFindBar = true
+
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = .textBackgroundColor
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = context.coordinator.textView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+
+        let fittingWidth = max(textView.intrinsicContentSize.width, scrollView.contentSize.width)
+        textView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: fittingWidth,
+            height: max(textView.frame.height, scrollView.contentSize.height)
+        )
+
+        if scrollsToBottom {
+            DispatchQueue.main.async {
+                textView.scrollToEndOfDocument(nil)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        weak var textView: NSTextView?
     }
 }
 
@@ -576,8 +845,13 @@ private struct StatsView: View {
     @State private var previousCPUUsageUsec: Int64?
     @State private var previousCPUTimestamp: Date?
     @State private var lastUpdatedAt: Date?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let refreshIntervalNanoseconds: UInt64 = 2_000_000_000
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -594,14 +868,14 @@ private struct StatsView: View {
                 .buttonStyle(.plain)
                 .disabled(isLoading)
 
-                Toggle("Auto-refresh", isOn: $isAutoRefreshEnabled)
+                Toggle(language.localized("Auto-refresh"), isOn: $isAutoRefreshEnabled)
                     .toggleStyle(.switch)
                     .controlSize(.small)
 
                 Spacer()
 
                 if let lastUpdatedAt {
-                    Text("Updated \(lastUpdatedAt, style: .time)")
+                    Text("\(language.localized("Updated")) \(lastUpdatedAt, style: .time)")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -628,7 +902,7 @@ private struct StatsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task {
                             await loadStats()
                         }
@@ -647,20 +921,20 @@ private struct StatsView: View {
                             memoryHistory: memoryHistory,
                             currentCPU: stats.cpuFormatted,
                             currentMemory: "\(stats.memoryFormatted)  •  \(stats.memoryUsage) / \(stats.memoryLimit)",
-                            cpuSubtitle: "Peak \(cpuPeakDisplay)",
-                            memorySubtitle: "Peak \(memoryPeakDisplay)"
+                            cpuSubtitle: "\(language.localized("Peak")) \(cpuPeakDisplay)",
+                            memorySubtitle: "\(language.localized("Peak")) \(memoryPeakDisplay)"
                         )
 
-                        InfoSection(title: "Network") {
-                            InfoRow(label: "Receive", value: stats.networkRx)
-                            InfoRow(label: "Transmit", value: stats.networkTx)
-                            InfoRow(label: "Total", value: stats.networkIO)
+                        InfoSection(title: language.localized("Network")) {
+                            InfoRow(label: language.localized("Receive"), value: stats.networkRx)
+                            InfoRow(label: language.localized("Transmit"), value: stats.networkTx)
+                            InfoRow(label: language.localized("Total"), value: stats.networkIO)
                         }
 
-                        InfoSection(title: "Disk") {
-                            InfoRow(label: "Read", value: stats.blockRead)
-                            InfoRow(label: "Write", value: stats.blockWrite)
-                            InfoRow(label: "Total", value: stats.blockIO)
+                        InfoSection(title: language.localized("Disk")) {
+                            InfoRow(label: language.localized("Read"), value: stats.blockRead)
+                            InfoRow(label: language.localized("Write"), value: stats.blockWrite)
+                            InfoRow(label: language.localized("Total"), value: stats.blockIO)
                         }
                     }
                     .padding(16)
@@ -670,7 +944,7 @@ private struct StatsView: View {
                     SwiftUI.Image(systemName: "chart.bar")
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
-                    Text("No stats available")
+                    Text(language.localized("No stats available"))
                         .font(.headline)
                         .foregroundStyle(.secondary)
                 }

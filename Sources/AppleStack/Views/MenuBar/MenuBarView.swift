@@ -4,6 +4,11 @@ struct MenuBarView: View {
     @Environment(\.cliBackend) private var cliBackend
     @State private var viewModel = SystemStatusViewModel(service: ContainerServiceFactory.create())
     @State private var containers: [Container] = []
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -11,7 +16,7 @@ struct MenuBarView: View {
                 Circle()
                     .fill(viewModel.isRunning ? .green : .red)
                     .frame(width: 8, height: 8)
-                Text(viewModel.isRunning ? "Running" : "Stopped")
+                Text(language.localized(viewModel.isRunning ? "Running" : "Stopped"))
                     .font(.headline)
                 Spacer()
             }
@@ -35,7 +40,7 @@ struct MenuBarView: View {
             if !containers.isEmpty {
                 Divider()
 
-                Text("Containers")
+                Text(language.localized("Containers"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -49,14 +54,14 @@ struct MenuBarView: View {
                             .lineLimit(1)
                         Spacer()
                         if container.state == .running {
-                            Button("Stop") {
+                            Button(language.localized("Stop")) {
                                 Task { try? await cliBackend.stopContainer(id: container.id) }
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
                             .font(.caption)
                         } else {
-                            Button("Start") {
+                            Button(language.localized("Start")) {
                                 Task { try? await cliBackend.startContainer(id: container.id) }
                             }
                             .buttonStyle(.plain)
@@ -69,11 +74,11 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button("Open AppleStack") {
+            Button(language.localized("Open AppleStack")) {
                 NSApp.activate(ignoringOtherApps: true)
             }
 
-            Button(viewModel.isRunning ? "Stop System" : "Start System") {
+            Button(language.localized(viewModel.isRunning ? "Stop System" : "Start System")) {
                 Task {
                     if viewModel.isRunning {
                         try? await cliBackend.systemStop()
@@ -86,7 +91,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button("Quit") {
+            Button(language.localized("Quit")) {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q")

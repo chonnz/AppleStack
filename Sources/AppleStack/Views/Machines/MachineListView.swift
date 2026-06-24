@@ -143,16 +143,22 @@ struct MachineListView: View {
     @State private var machineImageBuildStatus = "Preparing build..."
     @State private var machineImageBuildLog = ""
     @AppStorage(Self.lastBuiltMachineImageReferenceKey) private var lastBuiltMachineImageReference = ""
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+    @State private var pendingMachineIDs: Set<String> = []
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                title: "Machines",
-                subtitle: "\(machines.count) machines",
+                title: language.localized("Machines"),
+                subtitle: "\(machines.count) \(language.localized("machines"))",
                 leadingAccessory: nil,
-                leadingInset: 0
+                leadingInset: showsSidebarToggle ? AppTheme.windowControlsClearance : 0
             ) {
                 headerActions
             }
@@ -169,7 +175,7 @@ struct MachineListView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadMachines() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -181,7 +187,7 @@ struct MachineListView: View {
                     SwiftUI.Image(systemName: "desktopcomputer")
                         .font(.system(size: 52))
                         .foregroundStyle(.tertiary)
-                    Text("No machines")
+                    Text(language.localized("No machines"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -191,7 +197,7 @@ struct MachineListView: View {
                     SwiftUI.Image(systemName: "magnifyingglass")
                         .font(.system(size: 40))
                         .foregroundStyle(.tertiary)
-                    Text("No matching machines")
+                    Text(language.localized("No matching machines"))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -203,6 +209,7 @@ struct MachineListView: View {
                             MachineRowView(
                                 machine: machine,
                                 isSelected: selectedMachine?.id == machine.id,
+                                isPending: pendingMachineIDs.contains(machine.id),
                                 onStart: { Task { await startMachine(machine) } },
                                 onStop: { Task { await stopMachine(machine) } },
                                 onDelete: { machineToDelete = machine }
@@ -231,17 +238,17 @@ struct MachineListView: View {
                 set: { if !$0 { machineToDelete = nil } }
             )
         ) {
-            Button("Delete", role: .destructive) {
+            Button(language.localized("Delete"), role: .destructive) {
                 if let m = machineToDelete {
                     Task { await deleteMachine(m) }
                 }
                 machineToDelete = nil
             }
-            Button("Cancel", role: .cancel) {
+            Button(language.localized("Cancel"), role: .cancel) {
                 machineToDelete = nil
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(language.localized("This action cannot be undone."))
         }
         .sheet(isPresented: $showSetSheet) {
             setMachineSheet
@@ -299,7 +306,7 @@ struct MachineListView: View {
         HeaderCircleButton(
             systemName: "hammer",
             action: openMachineImageBuildSheet,
-            helpText: "Build machine image"
+            helpText: language.localized("Build machine image")
         )
     }
 
@@ -307,38 +314,38 @@ struct MachineListView: View {
         HeaderCircleButton(
             systemName: "plus",
             action: beginCreateMachine,
-            helpText: "New Machine"
+            helpText: language.localized("New Machine")
         )
     }
 
     private var overflowMenu: some View {
-        HeaderMenuButton(helpText: "More actions") {
+        HeaderMenuButton(helpText: language.localized("More actions")) {
             searchMenuActions
             Divider()
-            Button("Build Machine Image") {
+            Button(language.localized("Build Machine Image")) {
                 openMachineImageBuildSheet()
             }
 
-            Button("Inspect Selected Machine") {
+            Button(language.localized("Inspect Selected Machine")) {
                 if let selectedMachine {
                     Task { await inspectMachine(selectedMachine) }
                 }
             }
             .disabled(selectedMachine == nil)
 
-            Button("Show Selected Machine Logs") {
+            Button(language.localized("Show Selected Machine Logs")) {
                 if let selectedMachine {
                     Task { await machineLogs(selectedMachine) }
                 }
             }
             .disabled(selectedMachine == nil)
 
-            Button("Configure Selected Machine") {
+            Button(language.localized("Configure Selected Machine")) {
                 openSelectedMachineSettings()
             }
             .disabled(selectedMachine == nil)
 
-            Button("Set Selected as Default") {
+            Button(language.localized("Set Selected as Default")) {
                 if let selectedMachine {
                     Task { await setDefaultMachine(selectedMachine) }
                 }
@@ -349,12 +356,12 @@ struct MachineListView: View {
 
     private var searchMenuActions: some View {
         Group {
-            Button(isSearchExpanded ? "Hide Search" : "Search") {
+            Button(language.localized(isSearchExpanded ? "Hide Search" : "Search")) {
                 isSearchExpanded.toggle()
             }
 
             if !searchText.isEmpty {
-                Button("Clear Search") {
+                Button(language.localized("Clear Search")) {
                     searchText = ""
                 }
             }
@@ -365,49 +372,49 @@ struct MachineListView: View {
         HeaderSearchToggle(
             text: $searchText,
             isExpanded: $isSearchExpanded,
-            placeholder: "Search",
+            placeholder: language.localized("Search"),
             width: width
         )
     }
 
     private var createMachineSheet: some View {
         Form {
-            Section("Machine") {
-                TextField("Machine name", text: $newMachine.name)
+            Section(language.localized("Machine")) {
+                TextField(language.localized("Machine name"), text: $newMachine.name)
             }
 
             Section {
                 if !lastBuiltMachineImageReference.isEmpty {
-                    LabeledContent("Recent build") {
+                    LabeledContent(language.localized("Recent build")) {
                         Text(lastBuiltMachineImageReference)
                             .foregroundStyle(.secondary)
                             .font(.system(size: 12, design: .monospaced))
                             .textSelection(.enabled)
                     }
 
-                    Button("Use Recent Build") {
+                    Button(language.localized("Use Recent Build")) {
                         newMachine.image = lastBuiltMachineImageReference
                         syncSelectedMachineSelection()
                     }
                     .buttonStyle(.bordered)
                 }
 
-                Button("Build Machine Image...") {
+                Button(language.localized("Build Machine Image...")) {
                     prepareMachineImageBuildDefaults()
                     showMachineImageBuildSheet = true
                 }
                 .buttonStyle(.bordered)
 
-                Picker("Distribution", selection: $selectedMachineDistributionID) {
+                Picker(language.localized("Distribution"), selection: $selectedMachineDistributionID) {
                     ForEach(Self.machineDistributions) { distribution in
                         Text(distribution.title).tag(distribution.id)
                     }
-                    Text("Custom").tag("custom")
+                    Text(language.localized("Custom")).tag("custom")
                 }
                 .pickerStyle(.menu)
 
                 if let selectedDistribution {
-                    Picker("Version", selection: $selectedMachineVersionID) {
+                    Picker(language.localized("Version"), selection: $selectedMachineVersionID) {
                         ForEach(selectedDistribution.versions) { version in
                             Text(version.title).tag(version.id)
                         }
@@ -416,59 +423,59 @@ struct MachineListView: View {
                 }
 
                 if let selectedVersion {
-                    LabeledContent("Preset") {
+                    LabeledContent(language.localized("Preset")) {
                         Text(selectedVersion.image)
                             .foregroundStyle(.secondary)
                             .font(.system(size: 12, design: .monospaced))
                             .textSelection(.enabled)
                     }
-                    LabeledContent("Description") {
+                    LabeledContent(language.localized("Description")) {
                         Text(selectedVersion.description)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                TextField("Image reference", text: $newMachine.image)
+                TextField(language.localized("Image reference"), text: $newMachine.image)
                     .textFieldStyle(.roundedBorder)
             } header: {
-                Text("Image")
+                Text(language.localized("Image"))
             } footer: {
-                Text("Choose a preset image or enter any OCI reference supported by Apple container. Generic distro images may still fail to boot as machines if they do not provide the init process expected by Apple container, such as `/sbin/init`. A safer workflow is to build a machine-compatible image first from Images > Build image, then paste that image reference here.")
+                Text(language.localized("Choose a preset image or enter any OCI reference supported by Apple container. Generic distro images may still fail to boot as machines if they do not provide the init process expected by Apple container, such as `/sbin/init`. A safer workflow is to build a machine-compatible image first from Images > Build image, then paste that image reference here."))
             }
 
             Section {
                 Stepper(value: $newMachine.cpus, in: 1...16) {
                     LabeledContent("CPUs") {
-                        Text("\(newMachine.cpus) cores")
+                        Text("\(newMachine.cpus) \(language.localized("cores"))")
                             .foregroundStyle(.secondary)
                     }
                 }
-                TextField("Memory (e.g., 2G, 4G)", text: $newMachine.memory)
+                TextField(language.localized("Memory (e.g., 2G, 4G)"), text: $newMachine.memory)
             } header: {
-                Text("Resources")
+                Text(language.localized("Resources"))
             } footer: {
-                Text("The current `container machine create` CLI exposes CPU and memory settings only. Disk size is managed by the current machine/image defaults.")
+                Text(language.localized("The current `container machine create` CLI exposes CPU and memory settings only. Disk size is managed by the current machine/image defaults."))
             }
 
             Section {
-                LabeledContent("Target") {
+                LabeledContent(language.localized("Target")) {
                     Text("linux/arm64")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                LabeledContent("Selection") {
-                    Text("Default platform")
+                LabeledContent(language.localized("Selection")) {
+                    Text(language.localized("Default platform"))
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Architecture")
+                Text(language.localized("Architecture"))
             } footer: {
-                Text("Apple container supports `--arch`, `--os`, and `--platform` for `machine create`. This view currently uses the default `linux/arm64` target until explicit platform controls are wired into the form.")
+                Text(language.localized("Apple container supports `--arch`, `--os`, and `--platform` for `machine create`. This view currently uses the default `linux/arm64` target until explicit platform controls are wired into the form."))
             }
 
             Section {
-                Picker("Home folder mount", selection: $newMachine.homeMount) {
+                Picker(language.localized("Home folder mount"), selection: $newMachine.homeMount) {
                     ForEach(Self.machineHomeMountOptions) { option in
                         Text(option.title).tag(option.value)
                     }
@@ -481,16 +488,16 @@ struct MachineListView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Toggle("Set as default machine", isOn: $newMachine.setDefault)
-                Toggle("Create without booting", isOn: $newMachine.noBoot)
+                Toggle(language.localized("Set as default machine"), isOn: $newMachine.setDefault)
+                Toggle(language.localized("Create without booting"), isOn: $newMachine.noBoot)
             } header: {
-                Text("Advanced")
+                Text(language.localized("Advanced"))
             } footer: {
-                Text("Advanced options map directly to `--home-mount`, `--set-default`, and `--no-boot`.")
+                Text(language.localized("Advanced options map directly to `--home-mount`, `--set-default`, and `--no-boot`."))
             }
 
             if isCreatingMachine || !machineCreationLog.isEmpty || machineCreateInlineError != nil {
-                Section("Progress") {
+                Section(language.localized("Progress")) {
                     HStack(spacing: 10) {
                         if isCreatingMachine {
                             ProgressView()
@@ -508,7 +515,7 @@ struct MachineListView: View {
                     }
 
                     ScrollView {
-                        Text(machineCreationLog.isEmpty ? "Waiting for output..." : machineCreationLog)
+                        Text(machineCreationLog.isEmpty ? language.localized("Waiting for output...") : machineCreationLog)
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -540,7 +547,7 @@ struct MachineListView: View {
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
+                Button(language.localized("Cancel")) {
                     showCreateSheet = false
                     newMachine = MachineConfig()
                     resetMachineCreateState()
@@ -548,7 +555,7 @@ struct MachineListView: View {
                 .disabled(isCreatingMachine)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Create") {
+                Button(language.localized("Create")) {
                     Task {
                         let config = normalizedMachineConfig()
                         if await createMachine(config) {
@@ -566,25 +573,25 @@ struct MachineListView: View {
     private var machineImageBuildSheet: some View {
         Form {
             Section {
-                TextField("Context directory", text: $machineBuildContext)
-                TextField("Dockerfile/Containerfile path", text: $machineBuildFile)
-                TextField("Tag", text: $machineBuildTag)
-                TextField("Platform", text: $machineBuildPlatform)
-                TextField("DNS nameserver", text: $machineBuildDNS)
+                TextField(language.localized("Context directory"), text: $machineBuildContext)
+                TextField(language.localized("Dockerfile/Containerfile path"), text: $machineBuildFile)
+                TextField(language.localized("Tag"), text: $machineBuildTag)
+                TextField(language.localized("Platform"), text: $machineBuildPlatform)
+                TextField(language.localized("DNS nameserver"), text: $machineBuildDNS)
             } header: {
-                Text("Build Machine Image")
+                Text(language.localized("Build Machine Image"))
             } footer: {
-                Text("This follows the tutorial workflow: build a machine-oriented image first, then create a machine from the resulting tag.")
+                Text(language.localized("This follows the tutorial workflow: build a machine-oriented image first, then create a machine from the resulting tag."))
             }
 
             Section {
                 HStack(spacing: 10) {
-                    Button("Copy Template") {
+                    Button(language.localized("Copy Template")) {
                         copyMachineStarterTemplate()
                     }
                     .buttonStyle(.bordered)
 
-                    Button("Write Template File") {
+                    Button(language.localized("Write Template File")) {
                         writeMachineStarterTemplate()
                     }
                     .buttonStyle(.bordered)
@@ -599,13 +606,13 @@ struct MachineListView: View {
                 }
                 .frame(minHeight: 180, maxHeight: 220)
             } header: {
-                Text("Starter Containerfile")
+                Text(language.localized("Starter Containerfile"))
             } footer: {
-                Text("Use a base image that provides `/sbin/init`, reset machine-id files, and boot into a non-GUI target.")
+                Text(language.localized("Use a base image that provides `/sbin/init`, reset machine-id files, and boot into a non-GUI target."))
             }
 
             if isBuildingMachineImage || machineImageBuildError != nil || machineTemplateActionMessage != nil || !machineImageBuildLog.isEmpty {
-                Section("Build Status") {
+                Section(language.localized("Build Status")) {
                     if isBuildingMachineImage {
                         HStack(spacing: 10) {
                             ProgressView()
@@ -646,14 +653,14 @@ struct MachineListView: View {
         .frame(minWidth: 560, minHeight: 500)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
+                Button(language.localized("Cancel")) {
                     showMachineImageBuildSheet = false
                     machineImageBuildError = nil
                 }
                 .disabled(isBuildingMachineImage)
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Build") {
+                Button(language.localized("Build")) {
                     Task { await buildMachineImageFromCreateFlow() }
                 }
                 .disabled(
@@ -667,13 +674,13 @@ struct MachineListView: View {
 
     private var setMachineSheet: some View {
         Form {
-            Section("Machine Configuration") {
+            Section(language.localized("Machine Configuration")) {
                 Stepper("CPUs: \(machineCPUs)", value: $machineCPUs, in: 1...16)
-                TextField("Memory", text: $machineMemory)
-                Picker("Home Mount", selection: $machineHomeMount) {
-                    Text("Read/Write").tag("rw")
-                    Text("Read Only").tag("ro")
-                    Text("None").tag("none")
+                TextField(language.localized("Memory"), text: $machineMemory)
+                Picker(language.localized("Home Mount"), selection: $machineHomeMount) {
+                    Text(language.localized("Read/Write")).tag("rw")
+                    Text(language.localized("Read Only")).tag("ro")
+                    Text(language.localized("None")).tag("none")
                 }
             }
         }
@@ -681,10 +688,10 @@ struct MachineListView: View {
         .frame(minWidth: 420, minHeight: 240)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { showSetSheet = false }
+                Button(language.localized("Cancel")) { showSetSheet = false }
             }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Apply") {
+                Button(language.localized("Apply")) {
                     Task { await setMachineConfig() }
                 }
             }
@@ -693,15 +700,19 @@ struct MachineListView: View {
 
     // MARK: - Actions
 
-    private func loadMachines() async {
-        isLoading = true
+    private func loadMachines(showLoading: Bool = true) async {
+        if showLoading {
+            isLoading = true
+        }
         errorMessage = nil
         do {
             machines = try await cliBackend.listMachines()
         } catch {
             errorMessage = error.localizedDescription
         }
-        isLoading = false
+        if showLoading {
+            isLoading = false
+        }
     }
 
     private func buildMachineImageFromCreateFlow() async {
@@ -1052,9 +1063,13 @@ struct MachineListView: View {
     }
 
     private func startMachine(_ machine: Machine) async {
+        guard !pendingMachineIDs.contains(machine.id) else { return }
+        pendingMachineIDs.insert(machine.id)
+        defer { pendingMachineIDs.remove(machine.id) }
         do {
             try await cliBackend.startMachine(id: machine.id)
-            await loadMachines()
+            try await waitForMachine(id: machine.id) { $0?.status == .running }
+            await loadMachines(showLoading: false)
         } catch {
             let bootLogs = try? await cliBackend.machineLogs(id: machine.id, follow: false, tail: 120, boot: true)
             let runtimeLogs = try? await cliBackend.machineLogs(id: machine.id, follow: false, tail: 40, boot: false)
@@ -1064,6 +1079,7 @@ struct MachineListView: View {
                 runtimeLogs: runtimeLogs,
                 failureHeadline: "启动虚拟机失败。"
             )
+            await loadMachines(showLoading: false)
         }
     }
 
@@ -1114,23 +1130,36 @@ struct MachineListView: View {
     }
 
     private func stopMachine(_ machine: Machine) async {
+        guard !pendingMachineIDs.contains(machine.id) else { return }
+        pendingMachineIDs.insert(machine.id)
+        defer { pendingMachineIDs.remove(machine.id) }
         do {
             try await cliBackend.stopMachine(id: machine.id)
-            await loadMachines()
+            try await waitForMachine(id: machine.id) { found in
+                guard let found else { return true }
+                return found.status != .running
+            }
+            await loadMachines(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadMachines(showLoading: false)
         }
     }
 
     private func deleteMachine(_ machine: Machine) async {
+        guard !pendingMachineIDs.contains(machine.id) else { return }
+        pendingMachineIDs.insert(machine.id)
+        defer { pendingMachineIDs.remove(machine.id) }
         do {
             try await cliBackend.removeMachine(id: machine.id)
+            try await waitForMachine(id: machine.id) { $0 == nil }
             if selectedMachine?.id == machine.id {
                 selectedMachine = nil
             }
-            await loadMachines()
+            await loadMachines(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+            await loadMachines(showLoading: false)
         }
     }
 
@@ -1155,8 +1184,12 @@ struct MachineListView: View {
     }
 
     private func setDefaultMachine(_ machine: Machine) async {
+        guard !pendingMachineIDs.contains(machine.id) else { return }
+        pendingMachineIDs.insert(machine.id)
+        defer { pendingMachineIDs.remove(machine.id) }
         do {
             try await cliBackend.setDefaultMachine(id: machine.id)
+            await loadMachines(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1172,9 +1205,25 @@ struct MachineListView: View {
                 homeMount: machineHomeMount
             )
             showSetSheet = false
-            await loadMachines()
+            await loadMachines(showLoading: false)
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func waitForMachine(
+        id: String,
+        timeoutSeconds: Double = 45,
+        matches: (Machine?) -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            let latest = try await cliBackend.listMachines()
+            machines = latest
+            if matches(latest.first(where: { $0.id == id || $0.name == id })) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(700))
         }
     }
 }

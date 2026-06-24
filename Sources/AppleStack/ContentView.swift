@@ -1,30 +1,32 @@
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case dashboard = "Activity Monitor"
+    case activityMonitor = "Activity Monitor"
     case containers = "Containers"
     case images = "Images"
     case volumes = "Volumes"
     case networks = "Networks"
     case machines = "Machines"
     case registry = "Registry"
-    case builder = "Builder"
-    case system = "System"
+    case commands = "Commands"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .dashboard: "chart.bar.fill"
+        case .activityMonitor: "chart.line.uptrend.xyaxis"
         case .containers: "cube.box.fill"
         case .images: "square.3.layers.3d.down.right"
         case .volumes: "externaldrive"
         case .networks: "network"
         case .machines: "desktopcomputer"
-        case .registry: "person.crop.circle.badge.key"
-        case .builder: "hammer"
-        case .system: "gearshape"
+        case .registry: "key.fill"
+        case .commands: "terminal.fill"
         }
+    }
+
+    var isMerged: Bool {
+        self == .activityMonitor || self == .registry || self == .commands
     }
 }
 
@@ -32,10 +34,10 @@ struct ContentView: View {
     @State private var selectedSection: AppSection? = .containers
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.cliBackend) private var cliBackend
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     @State private var containerViewModel: ContainerListViewModel?
     @State private var imageViewModel: ImageListViewModel?
-    @State private var systemViewModel: SystemStatusViewModel?
     @State private var selectedContainer: Container?
     @State private var selectedImage: Image?
     @State private var selectedVolume: String?
@@ -51,18 +53,60 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
     var body: some View {
+        Group {
+            if selectedSection?.isMerged == true {
+                NavigationSplitView {
+                    sideBar
+                } detail: {
+                    mergedContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea(.container, edges: .top)
+                }
+                .frame(minWidth: 1000, minHeight: 600)
+            } else {
+                splitLayout
+            }
+        }
+        .onAppear(perform: initViewModels)
+    }
+
+    @ViewBuilder
+    private var mergedContent: some View {
+        switch selectedSection {
+        case .activityMonitor:
+            ActivityMonitorView()
+        case .registry:
+            RegistryView()
+                .environment(\.cliBackend, cliBackend)
+        case .commands:
+            CommandsView()
+        default:
+            Color.clear
+        }
+    }
+
+    private func initViewModels() {
+        guard containerViewModel == nil else { return }
+        containerViewModel = ContainerListViewModel(service: cliBackend)
+        imageViewModel = ImageListViewModel(service: cliBackend)
+    }
+
+    private var sideBar: some View {
+        SidebarView(selectedSection: Binding(
+            get: { selectedSection ?? .containers },
+            set: { selectedSection = $0 }
+        ))
+        .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
+    }
+
+    private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(selectedSection: Binding(
-                get: { selectedSection ?? .containers },
-                set: { selectedSection = $0 }
-            ))
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
+            sideBar
         } content: {
             Group {
                 switch selectedSection {
-                case .dashboard:
-                    MonitorView()
                 case .containers:
                     if let vm = containerViewModel {
                         ContainerListView(
@@ -102,27 +146,15 @@ struct ContentView: View {
                         selectedMachine: $selectedMachine
                     )
                     .environment(\.cliBackend, cliBackend)
-                case .registry:
-                    RegistryView()
-                        .environment(\.cliBackend, cliBackend)
-                case .builder:
-                    BuilderView()
-                        .environment(\.cliBackend, cliBackend)
-                case .system:
-                    if let vm = systemViewModel {
-                        SystemStatusView(viewModel: vm)
-                    }
+                case .activityMonitor, .registry, .commands:
+                    Color.clear
                 case .none:
-                    Text("Select an item")
+                    Text(language.localized("Select an item"))
                         .foregroundStyle(.secondary)
                 }
             }
             .ignoresSafeArea(.container, edges: .top)
-            .navigationSplitViewColumnWidth(
-                min: selectedSection == .containers ? 340 : 280,
-                ideal: selectedSection == .containers ? 410 : 320,
-                max: selectedSection == .containers ? 520 : 400
-            )
+            .navigationSplitViewColumnWidth(min: 280, ideal: 340, max: 400)
         } detail: {
             DetailPanel(
                 section: selectedSection ?? .containers,
@@ -135,15 +167,14 @@ struct ContentView: View {
             .ignoresSafeArea(.container, edges: .top)
         }
         .frame(minWidth: 1000, minHeight: 600)
-        .onAppear {
-            containerViewModel = ContainerListViewModel(service: cliBackend)
-            imageViewModel = ImageListViewModel(service: cliBackend)
-            systemViewModel = SystemStatusViewModel(service: cliBackend)
-        }
     }
 
     private func showSidebar() {
         columnVisibility = .all
+    }
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
     }
 }
 
@@ -156,11 +187,16 @@ private struct DetailPanel: View {
     let selectedMachine: Machine?
 
     @State private var selectedDetailTab = "Info"
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     private var tabTitles: [String] {
         switch section {
         case .containers:
-            ["Info", "Runtime", "Network", "Logs", "Terminal", "Stats", "Inspect"]
+            ["Info", "Runtime", "Network", "Logs", "Terminal", "Files", "Stats", "Inspect"]
         case .machines:
             ["Info", "Resources", "Terminal", "Inspect"]
         case .images:
@@ -229,10 +265,10 @@ private struct DetailPanel: View {
                     SwiftUI.Image(systemName: section.icon)
                         .font(.system(size: 56))
                         .foregroundStyle(.tertiary)
-                    Text("No Selection")
+                    Text(language.localized("No Selection"))
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(Color.gray.opacity(0.4))
-                    Text("Select an item from the list")
+                    Text(language.localized("Select an item from the list"))
                         .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -284,9 +320,10 @@ private struct DetailPanel: View {
                 Button {
                     selectedDetailTab = title
                 } label: {
-                    DetailTab(title: title, isSelected: selectedDetailTab == title)
+                    DetailTab(title: language.localized(title), isSelected: selectedDetailTab == title)
                 }
                 .buttonStyle(.plain)
+                .focusEffectDisabled()
             }
         }
         .padding(3)
@@ -301,15 +338,15 @@ private struct DetailPanel: View {
                     selectedDetailTab = title
                 } label: {
                     if title == selectedDetailTab {
-                        Label(title, systemImage: "checkmark")
+                        Label(language.localized(title), systemImage: "checkmark")
                     } else {
-                        Text(title)
+                        Text(language.localized(title))
                     }
                 }
             }
         } label: {
             HStack(spacing: 8) {
-                Text(selectedDetailTab)
+                Text(language.localized(selectedDetailTab))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -358,6 +395,11 @@ private struct ImageDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var rawInspectOutput: String?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Group {
@@ -389,7 +431,7 @@ private struct ImageDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadDetails() }
                     }
                     .buttonStyle(.borderedProminent)
@@ -444,24 +486,24 @@ private struct ImageDetailView: View {
 
     @ViewBuilder
     private func imageInfoContent(_ details: ImageInspectionDetails) -> some View {
-        ImageDetailSection(title: "Overview") {
+        ImageDetailSection(title: language.localized("Overview")) {
             ImageDetailCard {
                 ImageDetailRows(
                     rows: [
-                        .init(label: "Reference", value: details.reference),
+                        .init(label: language.localized("Reference"), value: details.reference),
                         .init(label: "ID", value: details.id, usesMonospacedFont: true),
-                        .init(label: "Digest", value: details.digest, usesMonospacedFont: true),
-                        .init(label: "Created", value: details.createdDisplay),
-                        .init(label: "Size", value: details.sizeDisplay),
-                        .init(label: "Platform", value: details.platformDisplay),
-                        .init(label: "Media Type", value: details.mediaType),
-                        .init(label: "Variant Digest", value: details.variantDigest, usesMonospacedFont: true),
+                        .init(label: language.localized("Digest"), value: details.digest, usesMonospacedFont: true),
+                        .init(label: language.localized("Created"), value: details.createdDisplay),
+                        .init(label: language.localized("Size"), value: details.sizeDisplay),
+                        .init(label: language.localized("Platform"), value: details.platformDisplay),
+                        .init(label: language.localized("Media Type"), value: details.mediaType),
+                        .init(label: language.localized("Variant Digest"), value: details.variantDigest, usesMonospacedFont: true),
                     ].filter(\.hasContent)
                 )
             }
         }
 
-        ImageDetailSection(title: "Actions") {
+        ImageDetailSection(title: language.localized("Actions")) {
             Button(action: exportImage) {
                 HStack(spacing: 12) {
                     SwiftUI.Image(systemName: "square.and.arrow.up")
@@ -471,10 +513,10 @@ private struct ImageDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Export")
+                        Text(language.localized("Export"))
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.primary)
-                        Text("Save this image as an OCI-compatible archive")
+                        Text(language.localized("Save this image as an OCI-compatible archive"))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -497,7 +539,7 @@ private struct ImageDetailView: View {
     @ViewBuilder
     private func imageConfigContent(_ details: ImageInspectionDetails) -> some View {
         if !details.configRows.isEmpty {
-            ImageDetailSection(title: "Config") {
+            ImageDetailSection(title: language.localized("Config")) {
                 ImageDetailCard {
                     ImageDetailRows(rows: details.configRows)
                 }
@@ -505,7 +547,7 @@ private struct ImageDetailView: View {
         }
 
         if !details.environment.isEmpty {
-            ImageDetailSection(title: "Environment") {
+            ImageDetailSection(title: language.localized("Environment")) {
                 ImageDetailCard {
                     ImageKeyValueTable(items: details.environment)
                 }
@@ -513,7 +555,7 @@ private struct ImageDetailView: View {
         }
 
         if !details.labels.isEmpty {
-            ImageDetailSection(title: "Labels") {
+            ImageDetailSection(title: language.localized("Labels")) {
                 ImageDetailCard {
                     ImageKeyValueTable(items: details.labels)
                 }
@@ -521,7 +563,7 @@ private struct ImageDetailView: View {
         }
 
         if !details.exposedPorts.isEmpty {
-            ImageDetailSection(title: "Exposed Ports") {
+            ImageDetailSection(title: language.localized("Exposed Ports")) {
                 ImageDetailCard {
                     ImageTagFlow(items: details.exposedPorts)
                 }
@@ -529,7 +571,7 @@ private struct ImageDetailView: View {
         }
 
         if !details.volumes.isEmpty {
-            ImageDetailSection(title: "Volumes") {
+            ImageDetailSection(title: language.localized("Volumes")) {
                 ImageDetailCard {
                     ImageTagFlow(items: details.volumes)
                 }
@@ -540,13 +582,13 @@ private struct ImageDetailView: View {
     @ViewBuilder
     private func imageHistoryContent(_ details: ImageInspectionDetails) -> some View {
         if !details.layers.isEmpty {
-            ImageDetailSection(title: "Layers") {
+            ImageDetailSection(title: language.localized("Layers")) {
                 ImageDetailCard {
                     VStack(spacing: 0) {
                         ForEach(Array(details.layers.enumerated()), id: \.offset) { index, layer in
                             ImageDetailRow(
                                 row: .init(
-                                    label: "Layer \(index + 1)",
+                                    label: "\(language.localized("Layer")) \(index + 1)",
                                     value: layer,
                                     usesMonospacedFont: true
                                 )
@@ -558,7 +600,7 @@ private struct ImageDetailView: View {
         }
 
         if !details.history.isEmpty {
-            ImageDetailSection(title: "History") {
+            ImageDetailSection(title: language.localized("History")) {
                 ImageDetailCard {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(details.history.enumerated()), id: \.offset) { index, item in
@@ -594,9 +636,9 @@ private struct ImageDetailView: View {
     }
 
     private var imageInspectContent: some View {
-        ImageDetailSection(title: "Inspect") {
+        ImageDetailSection(title: language.localized("Inspect")) {
             ImageDetailCard {
-                Text(rawInspectOutput?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? rawInspectOutput! : "No inspect output available")
+                Text(rawInspectOutput?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? rawInspectOutput! : language.localized("No inspect output available"))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
@@ -911,15 +953,20 @@ private struct ImageDetailRow: View {
 
 private struct ImageKeyValueTable: View {
     let items: [ImageInspectionDetails.KeyValueItem]
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Key")
+                Text(language.localized("Key"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("Value")
+                Text(language.localized("Value"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
             }

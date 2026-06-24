@@ -3,6 +3,7 @@ import SwiftUI
 struct MachineRowView: View {
     let machine: Machine
     let isSelected: Bool
+    let isPending: Bool
     let onStart: () -> Void
     let onStop: () -> Void
     let onDelete: () -> Void
@@ -11,21 +12,22 @@ struct MachineRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(isSelected ? Color.white.opacity(0.18) : Color.orange.opacity(0.16))
-                    .frame(width: 34, height: 34)
 
                 SwiftUI.Image(systemName: "desktopcomputer")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(isSelected ? .white : .orange)
-                
+
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
                     .overlay(Circle().stroke(Color.white.opacity(0.95), lineWidth: 1.5))
-                    .offset(x: 2, y: 2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .offset(x: 3, y: 3)
             }
+            .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(machine.name)
@@ -39,18 +41,28 @@ struct MachineRowView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                if machine.status == .running {
-                    IconButton(systemName: "square.fill", action: onStop)
-                        .foregroundStyle(actionColor)
+            Group {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 52, alignment: .trailing)
                 } else {
-                    IconButton(systemName: "play.fill", action: onStart)
-                        .foregroundStyle(actionColor)
+                    HStack(spacing: 4) {
+                        if machine.status == .running {
+                            IconButton(systemName: "square.fill", action: onStop)
+                                .foregroundStyle(actionColor)
+                        } else {
+                            IconButton(systemName: "play.fill", action: onStart)
+                                .foregroundStyle(actionColor)
+                        }
+                        IconButton(systemName: "trash.fill", action: onDelete)
+                            .foregroundStyle(actionColor)
+                    }
+                    .opacity(isHovered || isSelected ? 1 : 0)
                 }
-                IconButton(systemName: "trash.fill", action: onDelete)
-                    .foregroundStyle(actionColor)
             }
-            .opacity(isHovered || isSelected ? 1 : 0)
+            .disabled(isPending)
+            .opacity(isPending || isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -60,6 +72,7 @@ struct MachineRowView: View {
         .onHover { hovering in
             isHovered = hovering
         }
+        .disabled(isPending)
     }
 
     private var statusColor: Color {
@@ -110,6 +123,7 @@ private struct IconButton: View {
             memory: "2g"
         ),
         isSelected: false,
+        isPending: false,
         onStart: {},
         onStop: {},
         onDelete: {}

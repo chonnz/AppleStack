@@ -36,6 +36,11 @@ struct EmptyStateView: View {
 struct ErrorStateView: View {
     let message: String
     let retryAction: (() -> Void)?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     init(message: String, retryAction: (() -> Void)? = nil) {
         self.message = message
@@ -55,7 +60,7 @@ struct ErrorStateView: View {
                 .frame(maxWidth: 360)
 
             if let retryAction {
-                Button("Retry", action: retryAction)
+                Button(language.localized("Retry"), action: retryAction)
                     .buttonStyle(.borderedProminent)
             }
         }

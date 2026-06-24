@@ -4,6 +4,11 @@ struct InspectOutputSheet: View {
     let title: String
     let output: String
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -11,7 +16,7 @@ struct InspectOutputSheet: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(language.localized("Done")) { dismiss() }
             }
             .padding()
 

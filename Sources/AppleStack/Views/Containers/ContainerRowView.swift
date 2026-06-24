@@ -4,6 +4,7 @@ import SwiftUI
 struct ContainerRowView: View {
     let container: Container
     let isSelected: Bool
+    let isPending: Bool
     let onStart: () -> Void
     let onStop: () -> Void
     let onDelete: () -> Void
@@ -18,6 +19,7 @@ struct ContainerRowView: View {
     init(
         container: Container,
         isSelected: Bool,
+        isPending: Bool = false,
         onStart: @escaping () -> Void,
         onStop: @escaping () -> Void,
         onDelete: @escaping () -> Void,
@@ -29,6 +31,7 @@ struct ContainerRowView: View {
     ) {
         self.container = container
         self.isSelected = isSelected
+        self.isPending = isPending
         self.onStart = onStart
         self.onStop = onStop
         self.onDelete = onDelete
@@ -41,7 +44,7 @@ struct ContainerRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(iconBackground)
                     .frame(width: 34, height: 34)
@@ -49,7 +52,9 @@ struct ContainerRowView: View {
                 SwiftUI.Image(systemName: "cube.box.fill")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(iconForeground)
-                
+            }
+            .frame(width: 34, height: 34)
+            .overlay(alignment: .bottomTrailing) {
                 Circle()
                     .fill(container.statusColor)
                     .frame(width: 8, height: 8)
@@ -70,21 +75,31 @@ struct ContainerRowView: View {
 
             Spacer()
 
-            HStack(spacing: 4) {
-                if container.state == .running {
-                    IconButton(systemName: "link", action: openURL)
-                        .help(container.ports.isEmpty ? "No ports" : "Open in browser")
-                        .opacity(container.ports.isEmpty ? 0 : 1)
-                    IconButton(systemName: "square.fill", action: onStop)
-                        .foregroundStyle(actionColor)
+            Group {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 52, alignment: .trailing)
                 } else {
-                    IconButton(systemName: "play.fill", action: onStart)
-                        .foregroundStyle(actionColor)
+                    HStack(spacing: 4) {
+                        if container.state == .running {
+                            IconButton(systemName: "link", action: openURL)
+                                .help(container.ports.isEmpty ? "No ports" : "Open in browser")
+                                .opacity(container.ports.isEmpty ? 0 : 1)
+                            IconButton(systemName: "square.fill", action: onStop)
+                                .foregroundStyle(actionColor)
+                        } else {
+                            IconButton(systemName: "play.fill", action: onStart)
+                                .foregroundStyle(actionColor)
+                        }
+                        IconButton(systemName: "trash.fill", action: onDelete)
+                            .foregroundStyle(actionColor)
+                    }
+                    .opacity(isHovered || isSelected ? 1 : 0)
                 }
-                IconButton(systemName: "trash.fill", action: onDelete)
-                    .foregroundStyle(actionColor)
             }
-            .opacity(isHovered || isSelected ? 1 : 0)
+            .disabled(isPending)
+            .opacity(isPending || isHovered || isSelected ? 1 : 0)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
@@ -107,6 +122,7 @@ struct ContainerRowView: View {
                 onCopy: onCopy ?? {}
             )
         }
+        .disabled(isPending)
     }
 
     private var rowBackground: some ShapeStyle {

@@ -8,8 +8,13 @@ struct VolumeDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var rawInspectOutput: String?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         Group {
@@ -22,7 +27,7 @@ struct VolumeDetailView: View {
                         switch selectedTab {
                         case "Labels":
                             if !details.labels.isEmpty {
-                                InspectorSection(title: "Labels") {
+                                InspectorSection(title: language.localized("Labels")) {
                                     InspectorCard {
                                         InspectorKeyValueTable(items: details.labels)
                                     }
@@ -30,14 +35,14 @@ struct VolumeDetailView: View {
                             }
                         case "Options":
                             if !details.options.isEmpty {
-                                InspectorSection(title: "Options") {
+                                InspectorSection(title: language.localized("Options")) {
                                     InspectorCard {
                                         InspectorKeyValueTable(items: details.options)
                                     }
                                 }
                             }
                         case "Inspect":
-                            InspectorSection(title: "Inspect") {
+                            InspectorSection(title: language.localized("Inspect")) {
                                 InspectorCard {
                                     Text(rawInspectOutput?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? rawInspectOutput! : "No inspect output available")
                                         .font(.system(size: 11, design: .monospaced))
@@ -73,7 +78,7 @@ struct VolumeDetailView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         Task { await loadDetails() }
                     }
                     .buttonStyle(.borderedProminent)

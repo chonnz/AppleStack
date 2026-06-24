@@ -17,6 +17,7 @@ struct AppleStackApp: App {
             SettingsView()
                 .environment(\.cliBackend, cliBackend)
         }
+        .windowStyle(.hiddenTitleBar)
 
         MenuBarExtra("AppleStack", systemImage: "shippingbox") {
             MenuBarView()
