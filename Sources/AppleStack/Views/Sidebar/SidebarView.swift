@@ -2,52 +2,49 @@ import SwiftUI
 
 struct SidebarView: View {
     @Binding var selectedSection: AppSection
+    @AppStorage("appLanguage") private var appLanguageRaw = "en"
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
-                    SidebarItem(title: "Containers", icon: "cube.box.fill", iconTint: ModuleTint.containers, isSelected: selectedSection == .containers) {
+                    SidebarGroupLabel(localized("Containers"))
+
+                    SidebarItem(title: localized("Containers"), icon: "cube.box.fill", iconTint: ModuleTint.containers, isSelected: selectedSection == .containers) {
                         selectedSection = .containers
                     }
-                    SidebarItem(title: "Images", icon: "square.3.layers.3d.down.right", iconTint: ModuleTint.images, isSelected: selectedSection == .images) {
+                    SidebarItem(title: localized("Images"), icon: "square.3.layers.3d.down.right", iconTint: ModuleTint.images, isSelected: selectedSection == .images) {
                         selectedSection = .images
                     }
-                    SidebarItem(title: "Volumes", icon: "externaldrive", iconTint: ModuleTint.volumes, isSelected: selectedSection == .volumes) {
+                    SidebarItem(title: localized("Volumes"), icon: "externaldrive", iconTint: ModuleTint.volumes, isSelected: selectedSection == .volumes) {
                         selectedSection = .volumes
                     }
-                    SidebarItem(title: "Networks", icon: "network", iconTint: ModuleTint.networks, isSelected: selectedSection == .networks) {
+                    SidebarItem(title: localized("Networks"), icon: "network", iconTint: ModuleTint.networks, isSelected: selectedSection == .networks) {
                         selectedSection = .networks
                     }
 
-                    Divider()
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                    SidebarGroupLabel("Linux")
+                        .padding(.top, 10)
 
-                    SidebarItem(title: "Machines", icon: "desktopcomputer", iconTint: ModuleTint.machines, isSelected: selectedSection == .machines) {
+                    SidebarItem(title: localized("Machines"), icon: "desktopcomputer", iconTint: ModuleTint.machines, isSelected: selectedSection == .machines) {
                         selectedSection = .machines
                     }
 
-                    Divider()
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
+                    SidebarGroupLabel(localized("General"))
+                        .padding(.top, 10)
 
-                    SidebarItem(title: "Registry", icon: "person.crop.circle.badge.key", iconTint: ModuleTint.registry, isSelected: selectedSection == .registry) {
+                    SidebarItem(title: localized("Registry"), icon: "key.fill", iconTint: ModuleTint.registry, isSelected: selectedSection == .registry) {
                         selectedSection = .registry
                     }
-                    SidebarItem(title: "Builder", icon: "hammer", iconTint: ModuleTint.builder, isSelected: selectedSection == .builder) {
-                        selectedSection = .builder
+                    SidebarItem(title: localized("Activity Monitor"), icon: "chart.line.uptrend.xyaxis", iconTint: ModuleTint.activityMonitor, isSelected: selectedSection == .activityMonitor) {
+                        selectedSection = .activityMonitor
                     }
-
-                    Divider()
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-
-                    SidebarItem(title: "Dashboard", icon: "chart.bar.fill", iconTint: ModuleTint.dashboard, isSelected: selectedSection == .dashboard) {
-                        selectedSection = .dashboard
-                    }
-                    SidebarItem(title: "System", icon: "gearshape", iconTint: ModuleTint.system, isSelected: selectedSection == .system) {
-                        selectedSection = .system
+                    SidebarItem(title: localized("Commands"), icon: "terminal.fill", iconTint: ModuleTint.commands, isSelected: selectedSection == .commands) {
+                        selectedSection = .commands
                     }
                 }
                 .padding(.horizontal, 10)
@@ -72,6 +69,27 @@ struct SidebarView: View {
             }
         }
         .background(AppTheme.chromeBackground)
+    }
+
+    private func localized(_ value: String) -> String {
+        language.localized(value)
+    }
+}
+
+private struct SidebarGroupLabel: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(AppTheme.sidebarGroupText)
+            .padding(.horizontal, 11)
+            .padding(.top, 4)
+            .padding(.bottom, 5)
     }
 }
 

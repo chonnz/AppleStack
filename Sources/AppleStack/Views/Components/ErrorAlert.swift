@@ -5,6 +5,11 @@ struct ErrorAlert: View {
     let message: String
     let onDismiss: () -> Void
     let onRetry: (() -> Void)?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     init(title: String = "Error", message: String, onDismiss: @escaping () -> Void, onRetry: (() -> Void)? = nil) {
         self.title = title
@@ -30,14 +35,14 @@ struct ErrorAlert: View {
 
             HStack(spacing: 12) {
                 if let onRetry {
-                    Button("Retry") {
+                    Button(language.localized("Retry")) {
                         onRetry()
                         onDismiss()
                     }
                     .buttonStyle(.borderedProminent)
                 }
 
-                Button("OK") {
+                Button(language.localized("OK")) {
                     onDismiss()
                 }
                 .buttonStyle(.bordered)
