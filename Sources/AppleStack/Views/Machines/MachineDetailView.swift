@@ -8,8 +8,13 @@ struct MachineDetailView: View {
     @State private var inspectOutput: String?
     @State private var isLoadingInspect = false
     @State private var inspectError: String?
+    @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private let cliBackend = CLIBackend()
+
+    private var language: AppLanguage {
+        AppLanguage(rawValue: appLanguageRaw) ?? .english
+    }
 
     init(machine: Machine, selectedTab: String) {
         self.machine = machine
@@ -95,13 +100,13 @@ struct MachineDetailView: View {
 
     private var terminalView: some View {
         NativeTerminalView(
-            sessionTitle: "Machine Terminal",
+            sessionTitle: language.localized("Machine Terminal"),
             sessionSubtitle: machine.name,
             prompt: "\(machine.name) %",
-            placeholder: "Enter shell command",
+            placeholder: language.localized("Enter shell command"),
             isAvailable: machine.status == .running,
-            unavailableTitle: "Machine is not running",
-            unavailableMessage: "Start the machine to access the terminal.",
+            unavailableTitle: language.localized("Machine is not running"),
+            unavailableMessage: language.localized("Start the machine to access the terminal."),
             showsMacTerminalButton: true,
             session: terminalSession
         )

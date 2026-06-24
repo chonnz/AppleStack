@@ -22,7 +22,6 @@ struct NativeTerminalView: View {
 
     private let backgroundColor = AppTheme.terminalBackground
     private let borderColor = AppTheme.terminalBorder
-    private let foregroundColor = Color.primary
     private let promptColor = Color(nsColor: NSColor.systemGreen)
     private let terminalUserColor = NSColor.systemGreen
     private let terminalHostColor = NSColor.systemBlue
@@ -33,29 +32,14 @@ struct NativeTerminalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            utilityBar
-            Divider()
-                .overlay(borderColor)
+            ZStack(alignment: .topTrailing) {
+                terminalSurface
 
-            if isAvailable {
-                TerminalConsoleView(
-                    attributedText: attributedTranscript,
-                    prompt: displayPrompt,
-                    command: $command,
-                    placeholder: placeholder,
-                    fontSize: CGFloat(terminalFontSize),
-                    isEnabled: isAvailable && session.isConnected,
-                    focusRequestToken: focusRequestToken,
-                    onSubmit: submitCurrentCommand,
-                    onHistoryUp: showPreviousCommand,
-                    onHistoryDown: showNextCommand,
-                    onClear: clearTranscript
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            } else {
-                unavailableView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(backgroundColor)
+                if isAvailable {
+                    terminalOverlayControls
+                        .padding(.top, 8)
+                        .padding(.trailing, 10)
+                }
             }
 
             if let errorMessage = displayedErrorMessage, isAvailable {
@@ -93,28 +77,36 @@ struct NativeTerminalView: View {
         }
     }
 
-    private var utilityBar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(sessionStatusColor)
-                    .frame(width: 7, height: 7)
+    @ViewBuilder
+    private var terminalSurface: some View {
+        if isAvailable {
+            TerminalConsoleView(
+                attributedText: attributedTranscript,
+                prompt: displayPrompt,
+                command: $command,
+                placeholder: placeholder,
+                fontSize: CGFloat(terminalFontSize),
+                isEnabled: isAvailable && session.isConnected,
+                focusRequestToken: focusRequestToken,
+                onSubmit: submitCurrentCommand,
+                onHistoryUp: showPreviousCommand,
+                onHistoryDown: showNextCommand,
+                onClear: clearTranscript
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            unavailableView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(backgroundColor)
+        }
+    }
 
-                Text(sessionSubtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(foregroundColor)
-                    .lineLimit(1)
-            }
-
-            Text(sessionStatusText)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 8)
-
+    private var terminalOverlayControls: some View {
+        HStack(spacing: 4) {
             if session.isLaunching {
                 ProgressView()
                     .controlSize(.small)
+                    .padding(.horizontal, 5)
             }
 
             if showsMacTerminalButton {
@@ -139,22 +131,12 @@ struct NativeTerminalView: View {
                 copyTranscript()
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(backgroundColor)
-    }
-
-    private var sessionStatusColor: Color {
-        if !isAvailable {
-            return .secondary
-        }
-        if session.isConnected {
-            return .green
-        }
-        if session.isLaunching {
-            return .orange
-        }
-        return .secondary
+        .padding(3)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(borderColor.opacity(0.8), lineWidth: 0.5)
+        )
     }
 
     private func terminalToolbarButton(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
@@ -234,19 +216,6 @@ struct NativeTerminalView: View {
         let host = normalizedName.isEmpty ? "Shell" : normalizedName
         let user = NSUserName()
         return "\(user)@\(host):~$"
-    }
-
-    private var sessionStatusText: String {
-        if !isAvailable {
-            return language.localized("Unavailable")
-        }
-        if session.isLaunching {
-            return language.localized("Connecting...")
-        }
-        if session.isConnected {
-            return language.localized("Connected")
-        }
-        return language.localized("Disconnected")
     }
 
     private func openMacTerminal() {
