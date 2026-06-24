@@ -9,12 +9,14 @@ struct NativeTerminalView: View {
     let isAvailable: Bool
     let unavailableTitle: String
     let unavailableMessage: String
+    var showsMacTerminalButton = false
     @ObservedObject var session: PersistentTerminalSession
 
     @State private var command = ""
     @State private var commandHistory: [String] = []
     @State private var historyIndex: Int?
     @State private var focusRequestToken = UUID()
+    @State private var externalTerminalError: String?
     @AppStorage("terminalFontSize") private var terminalFontSize = 12.0
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
@@ -56,7 +58,7 @@ struct NativeTerminalView: View {
                     .background(backgroundColor)
             }
 
-            if let errorMessage = session.lastError, isAvailable {
+            if let errorMessage = displayedErrorMessage, isAvailable {
                 Divider()
                     .overlay(borderColor)
                 errorBanner(errorMessage)
@@ -115,6 +117,13 @@ struct NativeTerminalView: View {
                     .controlSize(.small)
             }
 
+            if showsMacTerminalButton {
+                terminalToolbarButton("macwindow", help: language.localized("Open in macOS Terminal")) {
+                    openMacTerminal()
+                }
+                .disabled(!isAvailable)
+            }
+
             if isAvailable, !session.isConnected, !session.isLaunching {
                 terminalToolbarButton("bolt.horizontal", help: language.localized("Connect")) {
                     session.activateIfNeeded()
@@ -158,6 +167,10 @@ struct NativeTerminalView: View {
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .help(help)
+    }
+
+    private var displayedErrorMessage: String? {
+        externalTerminalError ?? session.lastError
     }
 
     private var unavailableView: some View {
@@ -225,15 +238,24 @@ struct NativeTerminalView: View {
 
     private var sessionStatusText: String {
         if !isAvailable {
-            return "Unavailable"
+            return language.localized("Unavailable")
         }
         if session.isLaunching {
-            return "Connecting..."
+            return language.localized("Connecting...")
         }
         if session.isConnected {
-            return "Connected"
+            return language.localized("Connected")
         }
-        return "Disconnected"
+        return language.localized("Disconnected")
+    }
+
+    private func openMacTerminal() {
+        do {
+            try session.openInMacTerminal()
+            externalTerminalError = nil
+        } catch {
+            externalTerminalError = error.localizedDescription
+        }
     }
 
     private func submitCurrentCommand() {

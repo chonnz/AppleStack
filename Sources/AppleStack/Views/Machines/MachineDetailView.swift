@@ -102,6 +102,7 @@ struct MachineDetailView: View {
             isAvailable: machine.status == .running,
             unavailableTitle: "Machine is not running",
             unavailableMessage: "Start the machine to access the terminal.",
+            showsMacTerminalButton: true,
             session: terminalSession
         )
     }

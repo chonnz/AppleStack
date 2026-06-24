@@ -522,6 +522,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Connect": return "连接"
         case "Clear terminal": return "清空终端"
         case "Copy terminal output": return "复制终端输出"
+        case "Open in macOS Terminal": return "在 macOS 终端中打开"
+        case "Unavailable": return "不可用"
+        case "Connecting...": return "连接中..."
+        case "Connected": return "已连接"
+        case "Disconnected": return "未连接"
         default: return value
         }
     }

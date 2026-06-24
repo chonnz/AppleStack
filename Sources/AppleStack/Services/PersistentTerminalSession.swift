@@ -23,6 +23,21 @@ final class PersistentTerminalSession: ObservableObject {
                 return "machine.\(id)"
             }
         }
+
+        func externalTerminalCommand(executableName: String = "container") -> String {
+            ([executableName] + launchArguments)
+                .map(Self.shellQuoted)
+                .joined(separator: " ")
+        }
+
+        private static func shellQuoted(_ value: String) -> String {
+            let safeCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-")
+            if value.rangeOfCharacter(from: safeCharacters.inverted) == nil {
+                return value
+            }
+
+            return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        }
     }
 
     @Published private(set) var transcript = ""
@@ -198,6 +213,34 @@ final class PersistentTerminalSession: ObservableObject {
         stderrPipe = nil
         isConnected = false
         isLaunching = false
+    }
+
+    func openInMacTerminal() throws {
+        let command = target.externalTerminalCommand(executableName: Self.findContainerPath() ?? "container")
+        let escapedCommand = command
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        let process = Process()
+        let errorPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = [
+            "-e", "tell application \"Terminal\"",
+            "-e", "activate",
+            "-e", "do script \"\(escapedCommand)\"",
+            "-e", "end tell",
+        ]
+        process.standardError = errorPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let message = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            throw CommandError.executionFailed(message?.isEmpty == false ? message! : "无法打开 macOS 终端。")
+        }
     }
 
     private func appendOutput(_ data: Data) {
