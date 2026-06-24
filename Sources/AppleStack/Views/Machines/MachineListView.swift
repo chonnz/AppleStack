@@ -143,6 +143,7 @@ struct MachineListView: View {
     @State private var machineTemplateActionMessage: String?
     @State private var machineImageBuildStatus = "Preparing build..."
     @State private var machineImageBuildLog = ""
+    @State private var showMachineAdvancedOptions = false
     @AppStorage(Self.lastBuiltMachineImageReferenceKey) private var lastBuiltMachineImageReference = ""
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
     @State private var pendingMachineIDs: Set<String> = []
@@ -404,12 +405,6 @@ struct MachineListView: View {
                     .buttonStyle(.bordered)
                 }
 
-                Button(language.localized("Build Machine Image...")) {
-                    prepareMachineImageBuildDefaults()
-                    showMachineImageBuildSheet = true
-                }
-                .buttonStyle(.bordered)
-
                 Picker(language.localized("Distribution"), selection: $selectedMachineDistributionID) {
                     ForEach(Self.machineDistributions) { distribution in
                         Text(distribution.title).tag(distribution.id)
@@ -462,43 +457,55 @@ struct MachineListView: View {
                 Text(language.localized("The current `container machine create` CLI exposes CPU and memory settings only. Disk size is managed by the current machine/image defaults."))
             }
 
-            Section {
-                LabeledContent(language.localized("Target")) {
-                    Text("linux/arm64")
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                LabeledContent(language.localized("Selection")) {
-                    Text(language.localized("Default platform"))
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text(language.localized("Architecture"))
-            } footer: {
-                Text(language.localized("Apple container supports `--arch`, `--os`, and `--platform` for `machine create`. This view currently uses the default `linux/arm64` target until explicit platform controls are wired into the form."))
+            Section(language.localized("Advanced Options")) {
+                Toggle(language.localized("Show advanced options"), isOn: $showMachineAdvancedOptions)
             }
 
-            Section {
-                Picker(language.localized("Home folder mount"), selection: $newMachine.homeMount) {
-                    ForEach(Self.machineHomeMountOptions) { option in
-                        Text(option.title).tag(option.value)
+            if showMachineAdvancedOptions {
+                Section {
+                    Button(language.localized("Build Machine Image...")) {
+                        prepareMachineImageBuildDefaults()
+                        showMachineImageBuildSheet = true
                     }
-                }
-                .pickerStyle(.menu)
+                    .buttonStyle(.bordered)
 
-                if let selectedHomeMountOption {
-                    Text(selectedHomeMountOption.description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    LabeledContent(language.localized("Target")) {
+                        Text("linux/arm64")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent(language.localized("Selection")) {
+                        Text(language.localized("Default platform"))
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(language.localized("Architecture"))
+                } footer: {
+                    Text(language.localized("Apple container supports `--arch`, `--os`, and `--platform` for `machine create`. This view currently uses the default `linux/arm64` target until explicit platform controls are wired into the form."))
                 }
 
-                Toggle(language.localized("Set as default machine"), isOn: $newMachine.setDefault)
-                Toggle(language.localized("Create without booting"), isOn: $newMachine.noBoot)
-            } header: {
-                Text(language.localized("Advanced"))
-            } footer: {
-                Text(language.localized("Advanced options map directly to `--home-mount`, `--set-default`, and `--no-boot`."))
+                Section {
+                    Picker(language.localized("Home folder mount"), selection: $newMachine.homeMount) {
+                        ForEach(Self.machineHomeMountOptions) { option in
+                            Text(option.title).tag(option.value)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if let selectedHomeMountOption {
+                        Text(selectedHomeMountOption.description)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Toggle(language.localized("Set as default machine"), isOn: $newMachine.setDefault)
+                    Toggle(language.localized("Create without booting"), isOn: $newMachine.noBoot)
+                } header: {
+                    Text(language.localized("Advanced"))
+                } footer: {
+                    Text(language.localized("Advanced options map directly to `--home-mount`, `--set-default`, and `--no-boot`."))
+                }
             }
 
             if isCreatingMachine || !machineCreationLog.isEmpty || machineCreateInlineError != nil {

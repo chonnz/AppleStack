@@ -150,6 +150,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Create a Linux machine from a preset image.": return "从预设镜像创建 Linux 虚拟机。"
         case "Open Activity Monitor": return "打开活动监视器"
         case "See CPU, memory, network, and disk usage.": return "查看 CPU、内存、网络和磁盘占用。"
+        case "Advanced Options": return "高级选项"
+        case "Show advanced options": return "显示高级选项"
         case "Containers": return "容器"
         case "Images": return "镜像"
         case "Volumes": return "卷"

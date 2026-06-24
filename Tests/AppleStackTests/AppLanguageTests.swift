@@ -11,6 +11,8 @@ struct AppLanguageTests {
             "Create a container": "创建容器",
             "Create a virtual machine": "创建虚拟机",
             "Open Activity Monitor": "打开活动监视器",
+            "Advanced Options": "高级选项",
+            "Show advanced options": "显示高级选项",
             "Commands": "命令",
             "Use Apple container commands directly from macOS.": "直接在 macOS 中使用 Apple container 命令。",
             "System status": "系统状态",

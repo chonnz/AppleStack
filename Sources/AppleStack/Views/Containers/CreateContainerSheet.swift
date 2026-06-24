@@ -17,6 +17,7 @@ struct CreateContainerSheet: View {
     @State private var tmpfsSpec = ""
     @State private var capAdd = ""
     @State private var capDrop = ""
+    @State private var showAdvancedOptions = false
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
@@ -29,6 +30,7 @@ struct CreateContainerSheet: View {
             Section(language.localized("Basic Settings")) {
                 TextField(language.localized("Container Name"), text: $config.name)
                 TextField(language.localized("Image (e.g., nginx:latest)"), text: $config.image)
+                TextField(language.localized("Port Mapping (e.g., 8080:80)"), text: $config.ports)
             }
 
             Section(language.localized("Resources")) {
@@ -36,128 +38,133 @@ struct CreateContainerSheet: View {
                 TextField(language.localized("Memory (e.g., 512m, 2g)"), text: $config.memory)
             }
 
-            Section(language.localized("Network")) {
-                TextField(language.localized("Port Mapping (e.g., 8080:80)"), text: $config.ports)
-                addArraySectionRow(language.localized("Network (name[,mac=...,mtu=...])"), text: $networkSpec) {
-                    config.networks.append(networkSpec)
-                    networkSpec = ""
-                }
-                arrayRows(config.networks, icon: "network") { value in
-                    config.networks.removeAll { $0 == value }
-                }
-                TextField(language.localized("DNS (e.g., 8.8.8.8)"), text: $config.dns)
-                TextField(language.localized("DNS Domain"), text: $config.dnsDomain)
-                addArraySectionRow(language.localized("DNS Search Domain"), text: $dnsSearch) {
-                    config.dnsSearch.append(dnsSearch)
-                    dnsSearch = ""
-                }
-                arrayRows(config.dnsSearch, icon: "magnifyingglass") { value in
-                    config.dnsSearch.removeAll { $0 == value }
-                }
-                addArraySectionRow(language.localized("DNS Option"), text: $dnsOption) {
-                    config.dnsOptions.append(dnsOption)
-                    dnsOption = ""
-                }
-                arrayRows(config.dnsOptions, icon: "slider.horizontal.3") { value in
-                    config.dnsOptions.removeAll { $0 == value }
-                }
-                Toggle(language.localized("Do not configure DNS (--no-dns)"), isOn: $config.noDNS)
+            Section(language.localized("Advanced Options")) {
+                Toggle(language.localized("Show advanced options"), isOn: $showAdvancedOptions)
             }
 
-            Section(language.localized("Environment Variables")) {
-                envVarsList
-                addEnvVarRow
-                addArraySectionRow(language.localized("Env file path"), text: $envFile) {
-                    config.envFiles.append(envFile)
-                    envFile = ""
-                }
-                arrayRows(config.envFiles, icon: "doc.text") { value in
-                    config.envFiles.removeAll { $0 == value }
-                }
-            }
-
-            Section(language.localized("Volumes")) {
-                volumesList
-                addVolumeRow
-                addArraySectionRow(language.localized("Mount spec (type=bind,source=...,target=...,readonly)"), text: $mountSpec) {
-                    config.mounts.append(mountSpec)
-                    mountSpec = ""
-                }
-                arrayRows(config.mounts, icon: "shippingbox") { value in
-                    config.mounts.removeAll { $0 == value }
-                }
-                addArraySectionRow(language.localized("tmpfs path"), text: $tmpfsSpec) {
-                    config.tmpfs.append(tmpfsSpec)
-                    tmpfsSpec = ""
-                }
-                arrayRows(config.tmpfs, icon: "memorychip") { value in
-                    config.tmpfs.removeAll { $0 == value }
-                }
-                TextField(language.localized("Shared memory size (e.g., 1G)"), text: $config.shmSize)
-            }
-
-            Section(language.localized("Options")) {
-                Toggle(language.localized("Run in background (--detach)"), isOn: $config.detach)
-                Toggle(language.localized("Interactive mode (-i)"), isOn: $config.interactive)
-                Toggle(language.localized("Allocate TTY (-t)"), isOn: $config.tty)
-                Toggle(language.localized("Auto-remove (--rm)"), isOn: $config.autoRemove)
-            }
-
-            Section(language.localized("Process")) {
-                TextField(language.localized("Entrypoint"), text: $config.entrypoint)
-                TextField(language.localized("Working directory"), text: $config.workdir)
-                TextField(language.localized("User (name|uid[:gid])"), text: $config.user)
-                TextField("UID", text: $config.uid)
-                TextField("GID", text: $config.gid)
-                Toggle(language.localized("Use init process (--init)"), isOn: $config.initProcess)
-                TextField(language.localized("Init image"), text: $config.initImage)
-                addArraySectionRow(language.localized("Ulimit (type=soft[:hard])"), text: $ulimitSpec) {
-                    config.ulimits.append(ulimitSpec)
-                    ulimitSpec = ""
-                }
-                arrayRows(config.ulimits, icon: "speedometer") { value in
-                    config.ulimits.removeAll { $0 == value }
-                }
-            }
-
-            Section(language.localized("Platform & Runtime")) {
-                TextField(language.localized("Platform (e.g., linux/arm64)"), text: $config.platform)
-                TextField(language.localized("Architecture"), text: $config.arch)
-                TextField(language.localized("OS"), text: $config.os)
-                TextField(language.localized("Kernel path"), text: $config.kernel)
-                TextField(language.localized("Runtime handler"), text: $config.runtime)
-                TextField(language.localized("Registry scheme (auto/http/https)"), text: $config.scheme)
-                TextField(language.localized("Max concurrent downloads"), text: $config.maxConcurrentDownloads)
-            }
-
-            Section(language.localized("Capabilities & VM")) {
-                Toggle(language.localized("Read-only root filesystem"), isOn: $config.readOnly)
-                Toggle(language.localized("Enable Rosetta"), isOn: $config.rosetta)
-                Toggle(language.localized("Forward SSH agent"), isOn: $config.ssh)
-                Toggle(language.localized("Expose nested virtualization"), isOn: $config.virtualization)
-
-                addArraySectionRow(language.localized("Label (key=value)"), text: $labelSpec) {
-                    config.labels.append(labelSpec)
-                    labelSpec = ""
-                }
-                arrayRows(config.labels, icon: "tag") { value in
-                    config.labels.removeAll { $0 == value }
+            if showAdvancedOptions {
+                Section(language.localized("Network")) {
+                    addArraySectionRow(language.localized("Network (name[,mac=...,mtu=...])"), text: $networkSpec) {
+                        config.networks.append(networkSpec)
+                        networkSpec = ""
+                    }
+                    arrayRows(config.networks, icon: "network") { value in
+                        config.networks.removeAll { $0 == value }
+                    }
+                    TextField(language.localized("DNS (e.g., 8.8.8.8)"), text: $config.dns)
+                    TextField(language.localized("DNS Domain"), text: $config.dnsDomain)
+                    addArraySectionRow(language.localized("DNS Search Domain"), text: $dnsSearch) {
+                        config.dnsSearch.append(dnsSearch)
+                        dnsSearch = ""
+                    }
+                    arrayRows(config.dnsSearch, icon: "magnifyingglass") { value in
+                        config.dnsSearch.removeAll { $0 == value }
+                    }
+                    addArraySectionRow(language.localized("DNS Option"), text: $dnsOption) {
+                        config.dnsOptions.append(dnsOption)
+                        dnsOption = ""
+                    }
+                    arrayRows(config.dnsOptions, icon: "slider.horizontal.3") { value in
+                        config.dnsOptions.removeAll { $0 == value }
+                    }
+                    Toggle(language.localized("Do not configure DNS (--no-dns)"), isOn: $config.noDNS)
                 }
 
-                addArraySectionRow(language.localized("Capability to add"), text: $capAdd) {
-                    config.capAdd.append(capAdd)
-                    capAdd = ""
-                }
-                arrayRows(config.capAdd, icon: "plus.circle") { value in
-                    config.capAdd.removeAll { $0 == value }
+                Section(language.localized("Environment Variables")) {
+                    envVarsList
+                    addEnvVarRow
+                    addArraySectionRow(language.localized("Env file path"), text: $envFile) {
+                        config.envFiles.append(envFile)
+                        envFile = ""
+                    }
+                    arrayRows(config.envFiles, icon: "doc.text") { value in
+                        config.envFiles.removeAll { $0 == value }
+                    }
                 }
 
-                addArraySectionRow(language.localized("Capability to drop"), text: $capDrop) {
-                    config.capDrop.append(capDrop)
-                    capDrop = ""
+                Section(language.localized("Volumes")) {
+                    volumesList
+                    addVolumeRow
+                    addArraySectionRow(language.localized("Mount spec (type=bind,source=...,target=...,readonly)"), text: $mountSpec) {
+                        config.mounts.append(mountSpec)
+                        mountSpec = ""
+                    }
+                    arrayRows(config.mounts, icon: "shippingbox") { value in
+                        config.mounts.removeAll { $0 == value }
+                    }
+                    addArraySectionRow(language.localized("tmpfs path"), text: $tmpfsSpec) {
+                        config.tmpfs.append(tmpfsSpec)
+                        tmpfsSpec = ""
+                    }
+                    arrayRows(config.tmpfs, icon: "memorychip") { value in
+                        config.tmpfs.removeAll { $0 == value }
+                    }
+                    TextField(language.localized("Shared memory size (e.g., 1G)"), text: $config.shmSize)
                 }
-                arrayRows(config.capDrop, icon: "minus.circle") { value in
-                    config.capDrop.removeAll { $0 == value }
+
+                Section(language.localized("Options")) {
+                    Toggle(language.localized("Run in background (--detach)"), isOn: $config.detach)
+                    Toggle(language.localized("Interactive mode (-i)"), isOn: $config.interactive)
+                    Toggle(language.localized("Allocate TTY (-t)"), isOn: $config.tty)
+                    Toggle(language.localized("Auto-remove (--rm)"), isOn: $config.autoRemove)
+                }
+
+                Section(language.localized("Process")) {
+                    TextField(language.localized("Entrypoint"), text: $config.entrypoint)
+                    TextField(language.localized("Working directory"), text: $config.workdir)
+                    TextField(language.localized("User (name|uid[:gid])"), text: $config.user)
+                    TextField("UID", text: $config.uid)
+                    TextField("GID", text: $config.gid)
+                    Toggle(language.localized("Use init process (--init)"), isOn: $config.initProcess)
+                    TextField(language.localized("Init image"), text: $config.initImage)
+                    addArraySectionRow(language.localized("Ulimit (type=soft[:hard])"), text: $ulimitSpec) {
+                        config.ulimits.append(ulimitSpec)
+                        ulimitSpec = ""
+                    }
+                    arrayRows(config.ulimits, icon: "speedometer") { value in
+                        config.ulimits.removeAll { $0 == value }
+                    }
+                }
+
+                Section(language.localized("Platform & Runtime")) {
+                    TextField(language.localized("Platform (e.g., linux/arm64)"), text: $config.platform)
+                    TextField(language.localized("Architecture"), text: $config.arch)
+                    TextField(language.localized("OS"), text: $config.os)
+                    TextField(language.localized("Kernel path"), text: $config.kernel)
+                    TextField(language.localized("Runtime handler"), text: $config.runtime)
+                    TextField(language.localized("Registry scheme (auto/http/https)"), text: $config.scheme)
+                    TextField(language.localized("Max concurrent downloads"), text: $config.maxConcurrentDownloads)
+                }
+
+                Section(language.localized("Capabilities & VM")) {
+                    Toggle(language.localized("Read-only root filesystem"), isOn: $config.readOnly)
+                    Toggle(language.localized("Enable Rosetta"), isOn: $config.rosetta)
+                    Toggle(language.localized("Forward SSH agent"), isOn: $config.ssh)
+                    Toggle(language.localized("Expose nested virtualization"), isOn: $config.virtualization)
+
+                    addArraySectionRow(language.localized("Label (key=value)"), text: $labelSpec) {
+                        config.labels.append(labelSpec)
+                        labelSpec = ""
+                    }
+                    arrayRows(config.labels, icon: "tag") { value in
+                        config.labels.removeAll { $0 == value }
+                    }
+
+                    addArraySectionRow(language.localized("Capability to add"), text: $capAdd) {
+                        config.capAdd.append(capAdd)
+                        capAdd = ""
+                    }
+                    arrayRows(config.capAdd, icon: "plus.circle") { value in
+                        config.capAdd.removeAll { $0 == value }
+                    }
+
+                    addArraySectionRow(language.localized("Capability to drop"), text: $capDrop) {
+                        config.capDrop.append(capDrop)
+                        capDrop = ""
+                    }
+                    arrayRows(config.capDrop, icon: "minus.circle") { value in
+                        config.capDrop.removeAll { $0 == value }
+                    }
                 }
             }
         }
