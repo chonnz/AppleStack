@@ -26,6 +26,15 @@ protocol ContainerServiceProtocol: Sendable {
     /// 运行容器
     func runContainer(config: ContainerConfig, command: [String]) async throws -> String
 
+    /// 获取网络列表
+    func listNetworks() async throws -> [Network]
+
+    /// 获取卷列表
+    func listVolumes() async throws -> [String]
+
+    /// 获取虚拟机列表
+    func listMachines() async throws -> [Machine]
+
     /// 查看容器详情
     func inspectContainers(ids: [String]) async throws -> String
 
@@ -88,6 +97,18 @@ protocol ContainerServiceProtocol: Sendable {
 
     /// 系统属性列表
     func systemPropertyList() async throws -> String
+
+    /// 系统 DNS 配置列表
+    func systemDNSList() async throws -> String
+
+    /// 创建系统 DNS 域
+    func systemDNSCreate(domain: String, localhost: String?) async throws
+
+    /// 删除系统 DNS 域
+    func systemDNSDelete(domain: String) async throws
+
+    /// 设置系统内核
+    func systemKernelSet(path: String) async throws
 
     /// 获取容器日志
     func logs(containerId: String, follow: Bool, tail: Int?) async throws -> String

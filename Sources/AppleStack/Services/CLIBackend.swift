@@ -6,7 +6,17 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
     private let containerPath: String
 
     init() {
-        self.containerPath = Self.findContainerPath() ?? "/usr/local/bin/container"
+        let configuredPath = UserDefaults.standard
+            .string(forKey: "cliPath")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let configuredPath,
+           !configuredPath.isEmpty,
+           FileManager.default.isExecutableFile(atPath: configuredPath) {
+            self.containerPath = configuredPath
+        } else {
+            self.containerPath = Self.findContainerPath() ?? "/usr/local/bin/container"
+        }
     }
 
     /// 查找 container 命令路径
@@ -387,13 +397,37 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         if !config.dns.isEmpty {
             arguments.append(contentsOf: ["--dns", config.dns])
         }
+        if !config.dnsDomain.isEmpty {
+            arguments.append(contentsOf: ["--dns-domain", config.dnsDomain])
+        }
+        for dnsSearch in config.dnsSearch {
+            arguments.append(contentsOf: ["--dns-search", dnsSearch])
+        }
+        for dnsOption in config.dnsOptions {
+            arguments.append(contentsOf: ["--dns-option", dnsOption])
+        }
+        if config.noDNS {
+            arguments.append("--no-dns")
+        }
 
         for (key, value) in config.env {
             arguments.append(contentsOf: ["-e", "\(key)=\(value)"])
         }
+        for envFile in config.envFiles {
+            arguments.append(contentsOf: ["--env-file", envFile])
+        }
 
         for volume in config.volumes {
             arguments.append(contentsOf: ["-v", volume])
+        }
+        for mount in config.mounts {
+            arguments.append(contentsOf: ["--mount", mount])
+        }
+        for label in config.labels {
+            arguments.append(contentsOf: ["--label", label])
+        }
+        for network in config.networks {
+            arguments.append(contentsOf: ["--network", network])
         }
 
         if config.detach {
@@ -410,6 +444,75 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
 
         if config.autoRemove {
             arguments.append("--rm")
+        }
+        if !config.entrypoint.isEmpty {
+            arguments.append(contentsOf: ["--entrypoint", config.entrypoint])
+        }
+        if !config.workdir.isEmpty {
+            arguments.append(contentsOf: ["--workdir", config.workdir])
+        }
+        if !config.user.isEmpty {
+            arguments.append(contentsOf: ["--user", config.user])
+        }
+        if !config.uid.isEmpty {
+            arguments.append(contentsOf: ["--uid", config.uid])
+        }
+        if !config.gid.isEmpty {
+            arguments.append(contentsOf: ["--gid", config.gid])
+        }
+        for ulimit in config.ulimits {
+            arguments.append(contentsOf: ["--ulimit", ulimit])
+        }
+        if !config.platform.isEmpty {
+            arguments.append(contentsOf: ["--platform", config.platform])
+        }
+        if !config.arch.isEmpty {
+            arguments.append(contentsOf: ["--arch", config.arch])
+        }
+        if !config.os.isEmpty {
+            arguments.append(contentsOf: ["--os", config.os])
+        }
+        if !config.kernel.isEmpty {
+            arguments.append(contentsOf: ["--kernel", config.kernel])
+        }
+        if !config.runtime.isEmpty {
+            arguments.append(contentsOf: ["--runtime", config.runtime])
+        }
+        if config.initProcess {
+            arguments.append("--init")
+        }
+        if !config.initImage.isEmpty {
+            arguments.append(contentsOf: ["--init-image", config.initImage])
+        }
+        if config.readOnly {
+            arguments.append("--read-only")
+        }
+        if config.rosetta {
+            arguments.append("--rosetta")
+        }
+        if config.ssh {
+            arguments.append("--ssh")
+        }
+        if config.virtualization {
+            arguments.append("--virtualization")
+        }
+        if !config.shmSize.isEmpty {
+            arguments.append(contentsOf: ["--shm-size", config.shmSize])
+        }
+        for tmpfs in config.tmpfs {
+            arguments.append(contentsOf: ["--tmpfs", tmpfs])
+        }
+        for cap in config.capAdd {
+            arguments.append(contentsOf: ["--cap-add", cap])
+        }
+        for cap in config.capDrop {
+            arguments.append(contentsOf: ["--cap-drop", cap])
+        }
+        if !config.scheme.isEmpty {
+            arguments.append(contentsOf: ["--scheme", config.scheme])
+        }
+        if !config.maxConcurrentDownloads.isEmpty {
+            arguments.append(contentsOf: ["--max-concurrent-downloads", config.maxConcurrentDownloads])
         }
 
         arguments.append(config.image)

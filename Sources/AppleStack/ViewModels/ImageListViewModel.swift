@@ -33,6 +33,8 @@ final class ImageListViewModel {
     var buildTag = ""
     var buildPlatform = ""
     var buildDNS = ""
+    var pendingImageIDs: Set<String> = []
+    var activeGlobalOperations = 0
     
     var filteredImages: [Image] {
         guard !searchText.isEmpty else { return images }
@@ -65,6 +67,10 @@ final class ImageListViewModel {
 
     var headerSubtitle: String {
         images.isEmpty ? "0 items" : "\(totalSizeFormatted) total"
+    }
+
+    var isOperationRunning: Bool {
+        activeGlobalOperations > 0 || !pendingImageIDs.isEmpty
     }
     
     var autoRefresh = false
@@ -107,16 +113,10 @@ final class ImageListViewModel {
     }
     
     func pullImage(name: String) async {
-        isLoading = true
-        errorMessage = nil
-        do {
+        await runGlobalOperation {
             try await service.pullImage(name: name)
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
-        isLoading = false
     }
     
     func deleteImage(_ image: Image) async {
@@ -126,12 +126,10 @@ final class ImageListViewModel {
             return
         }
 
-        do {
+        await runImageOperation(image) {
             try await service.removeImage(id: image.deleteTarget)
+            try await waitForImage(id: image.id, reference: image.reference) { $0 == nil }
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
@@ -146,61 +144,46 @@ final class ImageListViewModel {
     }
 
     func loadImage(from inputPath: String) async {
-        do {
+        await runGlobalOperation {
             try await service.loadImage(inputPath: inputPath, force: false)
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
     func save(_ image: Image, to outputPath: String) async {
-        do {
+        await runImageOperation(image) {
             _ = try await service.saveImages(references: [image.reference], outputPath: outputPath, platform: nil)
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
     func tagSelectedImage() async {
         guard let image = selectedImageForAction else { return }
-        do {
+        await runImageOperation(image) {
             try await service.tagImage(source: image.reference, target: tagTarget)
             showTagSheet = false
             tagTarget = ""
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
     func pushSelectedImage() async {
         guard let image = selectedImageForAction else { return }
-        do {
+        await runImageOperation(image) {
             try await service.pushImage(reference: image.reference, platform: pushPlatform.isEmpty ? nil : pushPlatform)
             showPushSheet = false
             pushPlatform = ""
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
     func pruneImages() async {
-        do {
+        await runGlobalOperation {
             try await service.pruneImages(all: false)
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
     func buildImage() async {
-        do {
+        await runGlobalOperation {
             let options = ImageBuildOptions(
                 contextDirectory: buildContext,
                 dockerfilePath: buildFile.isEmpty ? nil : buildFile,
@@ -222,9 +205,6 @@ final class ImageListViewModel {
             buildPlatform = ""
             buildDNS = ""
             await loadImages()
-        } catch {
-            errorMessage = ContainerServiceErrorPresenter.message(for: error)
-            showError = true
         }
     }
 
@@ -306,5 +286,56 @@ final class ImageListViewModel {
             return lhs.size > rhs.size
         }
         return lhs.reference.localizedCaseInsensitiveCompare(rhs.reference) == .orderedAscending
+    }
+
+    func isPending(_ image: Image) -> Bool {
+        pendingImageIDs.contains(image.id)
+    }
+
+    private func runGlobalOperation(_ operation: () async throws -> Void) async {
+        activeGlobalOperations += 1
+        errorMessage = nil
+        defer { activeGlobalOperations -= 1 }
+        do {
+            try await operation()
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+            await loadImages()
+        }
+    }
+
+    private func runImageOperation(_ image: Image, operation: () async throws -> Void) async {
+        guard !pendingImageIDs.contains(image.id) else { return }
+        pendingImageIDs.insert(image.id)
+        errorMessage = nil
+        defer { pendingImageIDs.remove(image.id) }
+        do {
+            try await operation()
+        } catch {
+            errorMessage = ContainerServiceErrorPresenter.message(for: error)
+            showError = true
+            await loadImages()
+        }
+    }
+
+    private func waitForImage(
+        id: String,
+        reference: String,
+        timeoutSeconds: Double = 30,
+        matches: (Image?) -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            let latest = try await service.listImages()
+            images = latest.sorted(by: imageSort)
+            let found = latest.first { image in
+                image.id == id || image.reference == reference || image.deleteTarget == reference
+            }
+            if matches(found) {
+                return
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
     }
 }
