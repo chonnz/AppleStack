@@ -136,11 +136,11 @@ struct ContainerRowView: View {
     }
 
     private var iconBackground: Color {
-        isSelected ? Color.white.opacity(0.18) : Color.secondary.opacity(0.10)
+        isSelected ? Color.white.opacity(0.18) : Color.orange.opacity(0.16)
     }
 
     private var iconForeground: Color {
-        isSelected ? .white : .secondary
+        isSelected ? .white : .orange
     }
 
     private var actionColor: Color {

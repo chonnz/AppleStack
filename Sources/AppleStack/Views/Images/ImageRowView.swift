@@ -120,12 +120,12 @@ struct ImageRowView: View {
 
     private var badgeColor: Color {
         if isDangling {
-            return .secondary
+            return .orange
         }
         if usageSummary != nil {
-            return .secondary
+            return AppTheme.accentColor
         }
-        return .secondary
+        return .blue
     }
 
     private var metadataText: String {

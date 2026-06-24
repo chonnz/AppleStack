@@ -14,11 +14,11 @@ struct MachineRowView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isSelected ? Color.white.opacity(0.18) : Color.secondary.opacity(0.10))
+                    .fill(isSelected ? Color.white.opacity(0.18) : Color.orange.opacity(0.16))
 
                 SwiftUI.Image(systemName: "desktopcomputer")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .foregroundStyle(isSelected ? .white : .orange)
 
                 Circle()
                     .fill(statusColor)
