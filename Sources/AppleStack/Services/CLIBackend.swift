@@ -1,5 +1,17 @@
 import Foundation
 
+struct ContainerFileEntry: Identifiable, Equatable {
+    let permissions: String
+    let owner: String
+    let group: String
+    let size: String
+    let modified: String
+    let name: String
+    let isDirectory: Bool
+
+    var id: String { name }
+}
+
 /// CLI 后端实现，通过 container 命令与容器运行时交互
 final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
     private let executor = CommandExecutor()
@@ -817,6 +829,47 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
 
     static func execContainerArguments(containerId: String, command: [String]) -> [String] {
         ["exec", containerId] + command
+    }
+
+    func listContainerDirectory(containerId: String, path: String) async throws -> [ContainerFileEntry] {
+        let output = try await executor.execute(
+            containerPath,
+            arguments: Self.listContainerDirectoryArguments(containerId: containerId, path: path)
+        )
+        return Self.parseContainerDirectoryOutput(output)
+    }
+
+    static func listContainerDirectoryArguments(containerId: String, path: String) -> [String] {
+        execContainerArguments(
+            containerId: containerId,
+            command: ["/bin/sh", "-lc", "LC_ALL=C ls -la \(shellQuote(path))"]
+        )
+    }
+
+    static func parseContainerDirectoryOutput(_ output: String) -> [ContainerFileEntry] {
+        output
+            .split(whereSeparator: \.isNewline)
+            .compactMap { line -> ContainerFileEntry? in
+                let parts = line.split(separator: " ", maxSplits: 8, omittingEmptySubsequences: true).map(String.init)
+                guard parts.count >= 9, parts[0] != "total", parts[8] != ".", parts[8] != ".." else { return nil }
+                return ContainerFileEntry(
+                    permissions: parts[0],
+                    owner: parts[2],
+                    group: parts[3],
+                    size: parts[4],
+                    modified: "\(parts[5]) \(parts[6]) \(parts[7])",
+                    name: parts[8],
+                    isDirectory: parts[0].hasPrefix("d")
+                )
+            }
+    }
+
+    private static func shellQuote(_ value: String) -> String {
+        let safeCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-")
+        if value.rangeOfCharacter(from: safeCharacters.inverted) == nil {
+            return value
+        }
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     /// 获取容器日志（支持流式输出）

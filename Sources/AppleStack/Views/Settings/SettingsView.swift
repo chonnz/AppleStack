@@ -527,6 +527,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Connecting...": return "连接中..."
         case "Connected": return "已连接"
         case "Disconnected": return "未连接"
+        case "Filesystem": return "文件系统"
+        case "Parent folder": return "上级文件夹"
+        case "Start the container to browse files.": return "启动容器后即可浏览文件。"
+        case "Loading files...": return "正在加载文件..."
+        case "Cannot load files": return "无法加载文件"
+        case "Empty folder": return "空文件夹"
+        case "No files in this directory.": return "此目录没有文件。"
+        case "Modified": return "修改时间"
+        case "Directory browsing uses a shell listing inside the running container. Copy and export still use Apple Containers CLI operations.": return "目录浏览会在运行中的容器内执行 Shell 列表命令；复制和导出仍使用 Apple Containers CLI 操作。"
         default: return value
         }
     }

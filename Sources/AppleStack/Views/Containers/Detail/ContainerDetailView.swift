@@ -15,6 +15,10 @@ struct ContainerDetailView: View {
     @State private var copyDirection: FileCopyDirection = .fromContainer
     @State private var fileActionStatus: String?
     @State private var isRunningFileAction = false
+    @State private var browserPath = "/"
+    @State private var fileEntries: [ContainerFileEntry] = []
+    @State private var isLoadingFiles = false
+    @State private var fileBrowserError: String?
     @State private var logSearchText = ""
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
@@ -67,6 +71,8 @@ struct ContainerDetailView: View {
                 await loadDetails()
             } else if selectedTab == "Logs" {
                 await logViewModel.loadLogs()
+            } else if selectedTab == "Files" {
+                await loadContainerDirectory()
             }
         }
     }
@@ -392,6 +398,81 @@ struct ContainerDetailView: View {
     private var filesView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                InspectorSection(title: language.localized("Filesystem")) {
+                    InspectorCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                TextField(language.localized("Container path"), text: $browserPath)
+                                    .textFieldStyle(.roundedBorder)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .onSubmit {
+                                        Task { await loadContainerDirectory() }
+                                    }
+
+                                Button {
+                                    browserPath = parentPath(of: browserPath)
+                                    Task { await loadContainerDirectory() }
+                                } label: {
+                                    SwiftUI.Image(systemName: "arrow.up")
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(browserPath == "/" || isLoadingFiles)
+                                .help(language.localized("Parent folder"))
+
+                                Button {
+                                    Task { await loadContainerDirectory() }
+                                } label: {
+                                    SwiftUI.Image(systemName: "arrow.clockwise")
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(isLoadingFiles)
+                                .help(language.localized("Refresh"))
+                            }
+
+                            if container.status != .running {
+                                emptyFilesMessage(
+                                    icon: "powerplug",
+                                    title: language.localized("Container is not running"),
+                                    message: language.localized("Start the container to browse files.")
+                                )
+                            } else if isLoadingFiles {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                    Text(language.localized("Loading files..."))
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 12)
+                            } else if let fileBrowserError {
+                                emptyFilesMessage(
+                                    icon: "exclamationmark.triangle",
+                                    title: language.localized("Cannot load files"),
+                                    message: fileBrowserError
+                                )
+                            } else if fileEntries.isEmpty {
+                                emptyFilesMessage(
+                                    icon: "folder",
+                                    title: language.localized("Empty folder"),
+                                    message: language.localized("No files in this directory.")
+                                )
+                            } else {
+                                VStack(spacing: 0) {
+                                    fileBrowserHeader
+                                    ForEach(fileEntries) { entry in
+                                        fileEntryRow(entry)
+                                    }
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(AppTheme.subtleBorder, lineWidth: 0.5)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 InspectorSection(title: language.localized("Copy Files")) {
                     InspectorCard {
                         VStack(alignment: .leading, spacing: 14) {
@@ -459,7 +540,7 @@ struct ContainerDetailView: View {
                             Text(String(format: language.localized("Container path uses `%@:/path`. Mac path is an absolute local path."), container.id))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
-                            Text(language.localized("Apple container currently exposes copy/export operations through CLI. This view avoids pretending that random-access file browsing is available."))
+                            Text(language.localized("Directory browsing uses a shell listing inside the running container. Copy and export still use Apple Containers CLI operations."))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -469,6 +550,87 @@ struct ContainerDetailView: View {
             .padding(16)
         }
         .background(AppTheme.paneBackground)
+    }
+
+    private var fileBrowserHeader: some View {
+        HStack(spacing: 10) {
+            Text(language.localized("Name"))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(language.localized("Size"))
+                .frame(width: 86, alignment: .trailing)
+            Text(language.localized("Modified"))
+                .frame(width: 120, alignment: .leading)
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(AppTheme.terminalSecondaryBackground)
+    }
+
+    private func fileEntryRow(_ entry: ContainerFileEntry) -> some View {
+        Button {
+            let path = joinedContainerPath(browserPath, entry.name)
+            containerPath = path
+            if entry.isDirectory {
+                browserPath = path
+                Task { await loadContainerDirectory() }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                SwiftUI.Image(systemName: entry.isDirectory ? "folder.fill" : "doc")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(entry.isDirectory ? ModuleTint.volumes : .secondary)
+                    .frame(width: 18)
+
+                Text(entry.name)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(entry.isDirectory ? "--" : entry.size)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 86, alignment: .trailing)
+
+                Text(entry.modified)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 120, alignment: .leading)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .opacity(0.45)
+        }
+    }
+
+    private func emptyFilesMessage(icon: String, title: String, message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            SwiftUI.Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 22)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(AppTheme.terminalSecondaryBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private var inspectView: some View {
@@ -532,6 +694,46 @@ struct ContainerDetailView: View {
     private var canCopyFiles: Bool {
         !containerPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             !localPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func loadContainerDirectory() async {
+        guard container.status == .running else {
+            fileEntries = []
+            fileBrowserError = nil
+            return
+        }
+
+        let path = normalizedContainerPath(browserPath)
+        browserPath = path
+        isLoadingFiles = true
+        fileBrowserError = nil
+        defer { isLoadingFiles = false }
+
+        do {
+            fileEntries = try await cliBackend.listContainerDirectory(containerId: container.id, path: path)
+        } catch {
+            fileEntries = []
+            fileBrowserError = error.localizedDescription
+        }
+    }
+
+    private func normalizedContainerPath(_ path: String) -> String {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "/" }
+        return trimmed.hasPrefix("/") ? trimmed : "/" + trimmed
+    }
+
+    private func parentPath(of path: String) -> String {
+        let normalized = normalizedContainerPath(path)
+        guard normalized != "/" else { return "/" }
+        let url = URL(fileURLWithPath: normalized)
+        let parent = url.deletingLastPathComponent().path
+        return parent.isEmpty ? "/" : parent
+    }
+
+    private func joinedContainerPath(_ base: String, _ name: String) -> String {
+        let normalized = normalizedContainerPath(base)
+        return normalized == "/" ? "/\(name)" : "\(normalized)/\(name)"
     }
 
     private func chooseLocalPath() {

@@ -23,6 +23,7 @@ struct CLIBackendCommandTests {
 
     @Test func terminalExecArgumentsDoNotDuplicateExecPrefix() {
         #expect(CLIBackend.execContainerArguments(containerId: "web", command: ["sh", "-lc", "pwd"]) == ["exec", "web", "sh", "-lc", "pwd"])
+        #expect(CLIBackend.listContainerDirectoryArguments(containerId: "web", path: "/app data") == ["exec", "web", "/bin/sh", "-lc", "LC_ALL=C ls -la '/app data'"])
     }
 
     @Test func machineArgumentsUseAvailableSubcommands() {
@@ -210,5 +211,21 @@ struct CLIBackendCommandTests {
         )
 
         #expect(cpuPercent == 25)
+    }
+
+    @Test func parseContainerDirectoryOutputKeepsNamesWithSpaces() {
+        let output = """
+        total 8
+        drwxr-xr-x  3 root root  96 Jun 24 12:00 .
+        drwxr-xr-x 18 root root 576 Jun 24 11:59 ..
+        drwxr-xr-x  2 root root  64 Jun 24 12:01 app data
+        -rw-r--r--  1 root root 128 Jun 24 12:02 config.json
+        """
+
+        let entries = CLIBackend.parseContainerDirectoryOutput(output)
+
+        #expect(entries.map(\.name) == ["app data", "config.json"])
+        #expect(entries.first?.isDirectory == true)
+        #expect(entries.last?.size == "128")
     }
 }
