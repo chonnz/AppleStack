@@ -130,7 +130,11 @@ struct ContainerListView: View {
         }
         .task {
             await viewModel.loadContainers()
+            selectFirstVisibleContainerIfNeeded()
             viewModel.startAutoRefresh()
+        }
+        .onChange(of: viewModel.filteredContainers.map(\.id)) { _, _ in
+            selectFirstVisibleContainerIfNeeded()
         }
         .onDisappear {
             viewModel.stopAutoRefresh()
@@ -151,6 +155,21 @@ struct ContainerListView: View {
         if panel.runModal() == .OK, let url = panel.url {
             Task { await viewModel.export(container, to: url.path) }
         }
+    }
+
+    private func selectFirstVisibleContainerIfNeeded() {
+        let visibleContainers = viewModel.filteredContainers
+        guard !visibleContainers.isEmpty else {
+            selectedContainer = nil
+            return
+        }
+
+        if let selectedContainer,
+           visibleContainers.contains(where: { $0.id == selectedContainer.id }) {
+            return
+        }
+
+        selectedContainer = visibleContainers[0]
     }
 
     @ViewBuilder
