@@ -15,6 +15,24 @@ final class PersistentTerminalSession: ObservableObject {
             }
         }
 
+        var usesOneShotCommands: Bool {
+            switch self {
+            case .container:
+                return false
+            case .machine:
+                return true
+            }
+        }
+
+        func oneShotArguments(command: String) -> [String] {
+            switch self {
+            case .container(let id):
+                return ["exec", id, "/bin/sh", "-lc", command]
+            case .machine(let id):
+                return ["machine", "run", "--name", id, "--", "/bin/sh", "-lc", command]
+            }
+        }
+
         var persistenceKey: String {
             switch self {
             case .container(let id):
@@ -44,10 +62,12 @@ final class PersistentTerminalSession: ObservableObject {
     @Published private(set) var commandHistory: [String] = []
     @Published private(set) var isConnected = false
     @Published private(set) var isLaunching = false
+    @Published private(set) var isExecutingCommand = false
     @Published private(set) var lastError: String?
 
     let target: Target
 
+    private let commandExecutor = CommandExecutor()
     private var process: Process?
     private var stdinPipe: Pipe?
     private var stdoutPipe: Pipe?
@@ -77,6 +97,13 @@ final class PersistentTerminalSession: ObservableObject {
 
     func activateIfNeeded() {
         guard process == nil, !isLaunching else { return }
+        if target.usesOneShotCommands {
+            isConnected = true
+            isLaunching = false
+            lastError = nil
+            return
+        }
+
         guard let executablePath = Self.findContainerPath() else {
             lastError = "未找到 `container` 命令。"
             return
@@ -156,9 +183,37 @@ final class PersistentTerminalSession: ObservableObject {
         }
     }
 
-    func send(command: String) throws {
+    func send(command: String) async throws {
         guard isConnected else {
             throw CommandError.executionFailed("终端会话尚未连接。")
+        }
+
+        if target.usesOneShotCommands {
+            guard !isExecutingCommand else {
+                throw CommandError.executionFailed("上一条命令仍在执行。")
+            }
+            guard let executablePath = Self.findContainerPath() else {
+                throw CommandError.executionFailed("未找到 `container` 命令。")
+            }
+
+            isExecutingCommand = true
+            defer { isExecutingCommand = false }
+
+            do {
+                let output = try await commandExecutor.execute(
+                    executablePath,
+                    arguments: target.oneShotArguments(command: command),
+                    timeout: 120
+                )
+                appendText(output)
+                if !output.hasSuffix("\n") {
+                    appendText("\n")
+                }
+            } catch {
+                lastError = error.localizedDescription
+                throw error
+            }
+            return
         }
 
         guard let fileHandle = stdinPipe?.fileHandleForWriting else {
@@ -213,6 +268,7 @@ final class PersistentTerminalSession: ObservableObject {
         stderrPipe = nil
         isConnected = false
         isLaunching = false
+        isExecutingCommand = false
     }
 
     func openInMacTerminal() throws {

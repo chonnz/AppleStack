@@ -86,7 +86,7 @@ struct NativeTerminalView: View {
                 command: $command,
                 placeholder: placeholder,
                 fontSize: CGFloat(terminalFontSize),
-                isEnabled: isAvailable && session.isConnected,
+                isEnabled: isAvailable && session.isConnected && !session.isExecutingCommand,
                 focusRequestToken: focusRequestToken,
                 onSubmit: submitCurrentCommand,
                 onHistoryUp: showPreviousCommand,
@@ -189,7 +189,7 @@ struct NativeTerminalView: View {
     }
 
     private var canSubmit: Bool {
-        isAvailable && session.isConnected && !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        isAvailable && session.isConnected && !session.isExecutingCommand && !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var displayedTranscript: String {
@@ -240,10 +240,12 @@ struct NativeTerminalView: View {
         session.appendLocalEcho("\(displayPrompt) \(trimmed)\n")
         requestInputFocus()
 
-        do {
-            try session.send(command: trimmed)
-        } catch {
-            session.appendLocalEcho("Error: \(error.localizedDescription)\n\n")
+        Task {
+            do {
+                try await session.send(command: trimmed)
+            } catch {
+                session.appendLocalEcho("Error: \(error.localizedDescription)\n\n")
+            }
         }
     }
 
