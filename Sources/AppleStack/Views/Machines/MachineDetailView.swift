@@ -57,6 +57,7 @@ struct MachineDetailView: View {
                                     .init(label: "Name", value: machine.name),
                                     .init(label: "ID", value: machine.id, usesMonospacedFont: true),
                                     .init(label: "Status", value: machine.status.rawValue),
+                                    .init(label: "IP Address", value: machine.ip, usesMonospacedFont: true),
                                     .init(label: "Image", value: machine.image, usesMonospacedFont: true),
                                     .init(label: "Created", value: machine.created),
                                 ].filter(\.hasContent))

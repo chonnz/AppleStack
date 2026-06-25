@@ -1436,14 +1436,14 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         }
 
         if let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            return array.compactMap { parseMachine(from: $0) }
+            return array.compactMap { Self.parseMachine(from: $0) }
         }
 
         return []
     }
 
     /// 从 JSON 解析机器对象
-    private func parseMachine(from json: [String: Any]) -> Machine? {
+    static func parseMachine(from json: [String: Any]) -> Machine? {
         let configuration = json["configuration"] as? [String: Any]
         let statusInfo = json["status"] as? [String: Any]
 
@@ -1476,7 +1476,8 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
             ?? json["Disk"] as? String
             ?? Self.formatMemory(configuration?["diskSizeInBytes"])
             ?? "20 GB"
-        let ip = statusInfo?["ipv4Address"] as? String
+        let ip = json["ipAddress"] as? String
+            ?? statusInfo?["ipv4Address"] as? String
             ?? json["ip"] as? String
             ?? json["IP"] as? String
             ?? ""

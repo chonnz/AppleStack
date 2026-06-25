@@ -34,6 +34,22 @@ struct CLIBackendCommandTests {
         #expect(CLIBackend.runMachineArguments(id: "dev", command: ["uname", "-a"]) == ["machine", "run", "--name", "dev", "--", "uname", "-a"])
     }
 
+    @Test func machineParserReadsCurrentIPAddressField() throws {
+        let machine = try #require(CLIBackend.parseMachine(from: [
+            "id": "ubuntu-dev",
+            "status": "running",
+            "image": ["reference": "local/machine-ubuntu:24.04"],
+            "ipAddress": "192.168.64.35",
+            "cpus": 4,
+            "memory": "4G",
+            "disk": "384M",
+        ]))
+
+        #expect(machine.id == "ubuntu-dev")
+        #expect(machine.ip == "192.168.64.35")
+        #expect(machine.status == .running)
+    }
+
     @Test func unavailableNetworkAttachmentCommandsAreNotConstructed() {
         #expect(CLIBackend.networkConnectArguments(networkId: "net", containerId: "web") == nil)
         #expect(CLIBackend.networkDisconnectArguments(networkId: "net", containerId: "web") == nil)
