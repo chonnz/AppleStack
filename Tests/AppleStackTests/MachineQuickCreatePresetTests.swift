@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import AppleStack
 
@@ -28,5 +29,17 @@ struct MachineQuickCreatePresetTests {
         #expect(config.homeMount == "rw")
         #expect(config.setDefault)
         #expect(!config.noBoot)
+    }
+
+    @Test func systemTemplateBuildOptionsUseAbsoluteContainerfilePath() {
+        let directory = URL(fileURLWithPath: "/tmp/applestack-template", isDirectory: true)
+
+        let options = MachineSystemTemplate.recommended.buildOptions(in: directory)
+
+        #expect(options.contextDirectory == "/tmp/applestack-template")
+        #expect(options.dockerfilePath == "/tmp/applestack-template/Containerfile")
+        #expect(options.tags == ["applestack/machine-ubuntu:24.04"])
+        #expect(options.platform == "linux/arm64")
+        #expect(options.dns == "8.8.8.8")
     }
 }

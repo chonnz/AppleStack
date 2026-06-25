@@ -67,6 +67,20 @@ struct MachineSystemTemplate: Identifiable, Equatable {
         CMD ["\(startupProgramPath)"]
         """
     }
+
+    func buildOptions(in templateDirectory: URL) -> ImageBuildOptions {
+        let containerfileURL = templateDirectory.appendingPathComponent("Containerfile")
+        return ImageBuildOptions(
+            contextDirectory: templateDirectory.path,
+            dockerfilePath: containerfileURL.path,
+            tags: [internalImageTag],
+            platform: "linux/arm64",
+            dns: "8.8.8.8",
+            buildArgs: [:],
+            noCache: false,
+            pull: false
+        )
+    }
 }
 
 struct MachineResourcePreset: Identifiable, Equatable {

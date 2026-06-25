@@ -546,16 +546,7 @@ struct MachineListView: View {
         let containerfileURL = templateDirectory.appendingPathComponent("Containerfile")
         try template.containerfile.write(to: containerfileURL, atomically: true, encoding: .utf8)
 
-        let options = ImageBuildOptions(
-            contextDirectory: templateDirectory.path,
-            dockerfilePath: "Containerfile",
-            tags: [template.internalImageTag],
-            platform: "linux/arm64",
-            dns: "8.8.8.8",
-            buildArgs: [:],
-            noCache: false,
-            pull: false
-        )
+        let options = template.buildOptions(in: templateDirectory)
 
         try await cliBackend.buildImage(options: options) { chunk in
             Task { @MainActor in
