@@ -110,6 +110,8 @@ scripts/build-app.sh
 open build/AppleStack.app
 ```
 
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the current release scope, verification checklist, and known limitations.
+
 ## Roadmap
 
 - Better coverage for every `container` CLI subcommand.
@@ -125,4 +127,4 @@ Issues and pull requests are welcome. For UI changes, please keep the app native
 
 ## License
 
-No license file is included yet. Add a `LICENSE` file before publishing if you want others to use, modify, and redistribute this project under clear terms.
+AppleStack is released under the MIT License. See [LICENSE](LICENSE).

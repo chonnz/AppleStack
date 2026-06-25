@@ -15,6 +15,15 @@ struct ContainerServiceErrorTests {
         #expect(ContainerServiceErrorPresenter.message(for: error) == "Container system service is not running. Click Start System or run `container system start`.")
     }
 
+    @Test func missingCLIMessageGivesInstallAndSettingsNextStep() {
+        let error = CommandError.executionFailed("The file “container” couldn’t be opened because there is no such file.")
+
+        let message = ContainerServiceErrorPresenter.message(for: error)
+
+        #expect(message.contains("Apple container CLI"))
+        #expect(message.contains("Settings > CLI"))
+    }
+
     @Test func machineImageBuildMessageExplainsDNSFailures() {
         let error = CommandError.commandFailed(
             1,

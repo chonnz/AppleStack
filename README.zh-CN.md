@@ -110,6 +110,8 @@ scripts/build-app.sh
 open build/AppleStack.app
 ```
 
+当前发布范围、验证清单和已知限制请见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
+
 ## 路线图
 
 - 更完整覆盖 `container` CLI 的所有子命令。
@@ -125,4 +127,4 @@ open build/AppleStack.app
 
 ## 许可证
 
-当前仓库尚未包含许可证文件。正式发布前建议添加 `LICENSE`，明确他人使用、修改和再分发本项目的条件。
+AppleStack 使用 MIT License 发布。详情见 [LICENSE](LICENSE)。

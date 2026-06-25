@@ -7,6 +7,7 @@ struct ContainerListView: View {
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
     @State private var containerToDelete: Container?
+    @State private var containerToKill: Container?
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private var language: AppLanguage {
@@ -56,7 +57,7 @@ struct ContainerListView: View {
                                     }
                                 },
                                 onInspect: { Task { await viewModel.inspect(container) } },
-                                onKill: { Task { await viewModel.kill(container) } },
+                                onKill: { containerToKill = container },
                                 onExport: { export(container) },
                                 onCopy: {
                                     viewModel.copySource = "\(container.id):/"
@@ -127,6 +128,25 @@ struct ContainerListView: View {
             }
         } message: {
             Text(language.localized("This action cannot be undone."))
+        }
+        .confirmationDialog(
+            language.localized("Kill container?"),
+            isPresented: .init(
+                get: { containerToKill != nil },
+                set: { if !$0 { containerToKill = nil } }
+            )
+        ) {
+            Button(language.localized("Kill"), role: .destructive) {
+                if let c = containerToKill {
+                    Task { await viewModel.kill(c) }
+                }
+                containerToKill = nil
+            }
+            Button(language.localized("Cancel"), role: .cancel) {
+                containerToKill = nil
+            }
+        } message: {
+            Text(language.localized("This immediately stops the running process inside the container."))
         }
         .task {
             await viewModel.loadContainers()

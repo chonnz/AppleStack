@@ -21,8 +21,7 @@ struct ContainerServiceFactory {
 
         // 自动选择：检查是否支持框架后端
         if #available(macOS 26, *) {
-            // TODO: 实现 FrameworkBackend
-            // return FrameworkBackend()
+            // FrameworkBackend 尚未进入生产路径，自动选择仍使用 CLI 后端。
             return CLIBackend()
         } else {
             return CLIBackend()
@@ -35,13 +34,8 @@ struct ContainerServiceFactory {
         case .cli:
             return CLIBackend()
         case .framework:
-            if #available(macOS 26, *) {
-                // TODO: 实现 FrameworkBackend
-                // return FrameworkBackend()
-                fatalError("FrameworkBackend 尚未实现")
-            } else {
-                fatalError("FrameworkBackend 需要 macOS 26 或更高版本")
-            }
+            // FrameworkBackend 尚未接入生产路径，显式请求时也回退 CLI，避免设置或未来入口触发崩溃。
+            return CLIBackend()
         }
     }
 }

@@ -15,6 +15,7 @@ struct VolumeListView: View {
     @State private var searchText = ""
     @State private var isSearchExpanded = false
     @State private var volumeToDelete: String?
+    @State private var showPruneConfirmation = false
     @State private var pendingVolumes: Set<String> = []
     @State private var isVolumeActionRunning = false
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
@@ -119,6 +120,17 @@ struct VolumeListView: View {
             }
         } message: {
             Text(language.localized("This action cannot be undone."))
+        }
+        .confirmationDialog(
+            language.localized("Prune unused volumes?"),
+            isPresented: $showPruneConfirmation
+        ) {
+            Button(language.localized("Prune Volumes"), role: .destructive) {
+                Task { await pruneVolumes() }
+            }
+            Button(language.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(language.localized("This removes unused local volumes. Existing containers are not deleted."))
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
@@ -294,7 +306,7 @@ struct VolumeListView: View {
     private var pruneButton: some View {
         HeaderCircleButton(
             systemName: isVolumeActionRunning ? "hourglass" : "trash",
-            action: { Task { await pruneVolumes() } },
+            action: { showPruneConfirmation = true },
             helpText: language.localized("Prune volumes")
         )
         .disabled(isVolumeActionRunning)
@@ -305,7 +317,7 @@ struct VolumeListView: View {
             searchMenuActions
             Divider()
             Button(language.localized("Prune Volumes")) {
-                Task { await pruneVolumes() }
+                showPruneConfirmation = true
             }
         }
     }

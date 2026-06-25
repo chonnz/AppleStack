@@ -75,7 +75,7 @@ final class ImageListViewModel {
     
     var autoRefresh = false
     private var refreshTask: Task<Void, Never>?
-    private nonisolated(unsafe) let service: ContainerServiceProtocol
+    private let service: ContainerServiceProtocol
 
     init(service: ContainerServiceProtocol) {
         self.service = service

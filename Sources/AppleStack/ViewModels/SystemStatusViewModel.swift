@@ -28,7 +28,7 @@ final class SystemStatusViewModel {
         return "\(info.os) \(info.arch)"
     }
     
-    private nonisolated(unsafe) let service: ContainerServiceProtocol
+    private let service: ContainerServiceProtocol
     
     init(service: ContainerServiceProtocol) {
         self.service = service

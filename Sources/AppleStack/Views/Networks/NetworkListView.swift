@@ -15,6 +15,7 @@ struct NetworkListView: View {
     @State private var searchText = ""
     @State private var isSearchExpanded = false
     @State private var networkToDelete: Network?
+    @State private var showPruneConfirmation = false
     @State private var pendingNetworkIDs: Set<String> = []
     @State private var isNetworkActionRunning = false
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
@@ -118,6 +119,17 @@ struct NetworkListView: View {
             }
         } message: {
             Text(language.localized("This action cannot be undone."))
+        }
+        .confirmationDialog(
+            language.localized("Prune unused networks?"),
+            isPresented: $showPruneConfirmation
+        ) {
+            Button(language.localized("Prune Networks"), role: .destructive) {
+                Task { await pruneNetworks() }
+            }
+            Button(language.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(language.localized("This removes unused local networks. Existing containers are not deleted."))
         }
         .sheet(isPresented: $showOutputSheet) {
             InspectOutputSheet(title: outputTitle, output: outputText)
@@ -312,7 +324,7 @@ struct NetworkListView: View {
     private var pruneButton: some View {
         HeaderCircleButton(
             systemName: isNetworkActionRunning ? "hourglass" : "trash",
-            action: { Task { await pruneNetworks() } },
+            action: { showPruneConfirmation = true },
             helpText: language.localized("Prune networks")
         )
         .disabled(isNetworkActionRunning)
@@ -323,7 +335,7 @@ struct NetworkListView: View {
             searchMenuActions
             Divider()
             Button(language.localized("Prune Networks")) {
-                Task { await pruneNetworks() }
+                showPruneConfirmation = true
             }
         }
     }

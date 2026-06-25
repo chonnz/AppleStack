@@ -12,7 +12,21 @@ enum ContainerServiceErrorPresenter {
         if isServiceNotRunning(error) {
             return "Container system service is not running. Click Start System or run `container system start`."
         }
+        if isCLINotFound(error) {
+            return "Apple container CLI not found. Install Apple container first, or configure the executable path in Settings > CLI."
+        }
         return error.localizedDescription
+    }
+
+    private static func isCLINotFound(_ error: Error) -> Bool {
+        guard case CommandError.executionFailed(let message) = error else {
+            return false
+        }
+        let text = message + "\n" + error.localizedDescription
+        return text.localizedCaseInsensitiveContains("no such file") ||
+            text.localizedCaseInsensitiveContains("couldn’t be opened") ||
+            text.localizedCaseInsensitiveContains("couldn't be opened") ||
+            text.localizedCaseInsensitiveContains("not found")
     }
 
     static func machineImageBuildMessage(

@@ -27,6 +27,12 @@ struct AppLanguageTests {
             "Hide Search": "隐藏搜索",
             "Create Volume": "创建卷",
             "Create Network": "创建网络",
+            "Kill container?": "强制停止容器？",
+            "This immediately stops the running process inside the container.": "这会立即停止容器内正在运行的进程。",
+            "Prune unused volumes?": "清理未使用的卷？",
+            "This removes unused local volumes. Existing containers are not deleted.": "这会移除未使用的本地卷，不会删除已有容器。",
+            "Prune unused networks?": "清理未使用的网络？",
+            "This removes unused local networks. Existing containers are not deleted.": "这会移除未使用的本地网络，不会删除已有容器。",
         ]
 
         for (source, expected) in requiredTranslations {

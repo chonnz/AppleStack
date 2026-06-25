@@ -3,10 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/build/AppleStack.app"
-EXECUTABLE="$ROOT_DIR/.build/debug/AppleStack"
+EXECUTABLE="$ROOT_DIR/.build/release/AppleStack"
 
 cd "$ROOT_DIR"
-swift build
+swift build -c release
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"

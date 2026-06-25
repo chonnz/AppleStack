@@ -27,6 +27,7 @@ struct QuickStartView: View {
                             title: language.localized("Start the system"),
                             subtitle: language.localized("Turn on Apple Containers before creating or running anything."),
                             icon: "power",
+                            tint: ModuleTint.system,
                             isBusy: isStartingSystem,
                             action: startSystem
                         )
@@ -35,6 +36,7 @@ struct QuickStartView: View {
                             title: language.localized("Create a container"),
                             subtitle: language.localized("Run an app from an image with only a name and image."),
                             icon: "cube.box.fill",
+                            tint: ModuleTint.containers,
                             action: onCreateContainer
                         )
 
@@ -42,6 +44,7 @@ struct QuickStartView: View {
                             title: language.localized("Create a virtual machine"),
                             subtitle: language.localized("Create a Linux machine from a preset image."),
                             icon: "desktopcomputer",
+                            tint: ModuleTint.machines,
                             action: onCreateMachine
                         )
 
@@ -49,6 +52,7 @@ struct QuickStartView: View {
                             title: language.localized("Open Activity Monitor"),
                             subtitle: language.localized("See CPU, memory, network, and disk usage."),
                             icon: "chart.line.uptrend.xyaxis",
+                            tint: ModuleTint.activityMonitor,
                             action: onOpenActivityMonitor
                         )
                     }
@@ -138,6 +142,7 @@ struct QuickStartView: View {
         title: String,
         subtitle: String,
         icon: String,
+        tint: Color,
         isBusy: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
@@ -145,14 +150,14 @@ struct QuickStartView: View {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.secondary.opacity(0.10))
+                        .fill(tint.opacity(0.13))
                     if isBusy {
                         ProgressView()
                             .controlSize(.small)
                     } else {
                         SwiftUI.Image(systemName: icon)
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(tint)
                     }
                 }
                 .frame(width: 42, height: 42)
@@ -171,10 +176,10 @@ struct QuickStartView: View {
 
                 ZStack {
                     Circle()
-                        .fill(AppTheme.badgeBackground)
+                        .fill(tint.opacity(0.13))
                     SwiftUI.Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(AppTheme.accentColor)
+                        .foregroundStyle(tint)
                 }
                 .frame(width: 24, height: 24)
                 .padding(.top, 1)
@@ -205,7 +210,7 @@ struct QuickStartView: View {
             do {
                 try await onStartSystem()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = ContainerServiceErrorPresenter.message(for: error)
             }
         }
     }

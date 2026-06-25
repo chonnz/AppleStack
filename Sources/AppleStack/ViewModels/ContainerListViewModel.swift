@@ -41,7 +41,7 @@ final class ContainerListViewModel {
         }
     }
     
-    private nonisolated(unsafe) let service: ContainerServiceProtocol
+    private let service: ContainerServiceProtocol
     private var refreshTask: Task<Void, Never>?
     private let refreshInterval: TimeInterval
     
