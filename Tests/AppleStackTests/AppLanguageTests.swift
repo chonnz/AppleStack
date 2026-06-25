@@ -33,6 +33,19 @@ struct AppLanguageTests {
             "This removes unused local volumes. Existing containers are not deleted.": "这会移除未使用的本地卷，不会删除已有容器。",
             "Prune unused networks?": "清理未使用的网络？",
             "This removes unused local networks. Existing containers are not deleted.": "这会移除未使用的本地网络，不会删除已有容器。",
+            "System template": "系统模板",
+            "Choose a system": "选择系统",
+            "AppleStack prepares the selected Linux system automatically.": "AppleStack 会自动准备选中的 Linux 系统。",
+            "Best for": "适合",
+            "Best choice for daily development": "适合日常开发的默认选择",
+            "Standard": "标准",
+            "Configuration": "配置",
+            "Home folder access": "主目录访问",
+            "Create but do not start yet": "创建后暂不启动",
+            "Preparing system template...": "正在准备系统模板...",
+            "Creating virtual machine...": "正在创建虚拟机...",
+            "Virtual machine is ready": "虚拟机已可用",
+            "Please enter a machine name.": "请先填写虚拟机名称。",
         ]
 
         for (source, expected) in requiredTranslations {

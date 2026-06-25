@@ -328,25 +328,6 @@ private struct BuildImageSheet: View {
         AppLanguage(rawValue: appLanguageRaw) ?? .english
     }
 
-    private let machineStarterTemplate = """
-    FROM ubuntu:24.04
-
-    ENV container docker
-
-    RUN apt-get update && \
-        apt-get install -y systemd systemd-sysv dbus sudo iproute2 iputils-ping curl vim && \
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/* && \
-        : > /etc/machine-id && \
-        : > /var/lib/dbus/machine-id && \
-        systemctl mask systemd-firstboot.service systemd-resolved.service && \
-        systemctl set-default multi-user.target
-
-    VOLUME ["/sys/fs/cgroup"]
-
-    CMD ["/sbin/init"]
-    """
-
     var body: some View {
         Form {
             Section(language.localized("Build Image")) {
@@ -355,40 +336,6 @@ private struct BuildImageSheet: View {
                 TextField(language.localized("Tag"), text: $viewModel.buildTag)
                 TextField(language.localized("Platform (optional)"), text: $viewModel.buildPlatform)
                 TextField(language.localized("DNS nameserver (optional)"), text: $viewModel.buildDNS)
-            }
-
-            Section {
-                Text(language.localized("For `container machine`, prefer building a custom image instead of using a generic distro tag directly."))
-                    .foregroundStyle(.secondary)
-                Text(language.localized("The image should provide `/sbin/init` at the root. If your build installs packages with `apt` or similar tools, configuring DNS can help avoid network resolution failures during build."))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-
-                Button(language.localized("Use Machine Build Defaults")) {
-                    viewModel.applyMachineBuildDefaults()
-                }
-                .buttonStyle(.bordered)
-            } header: {
-                Text(language.localized("Machine-Compatible Images"))
-            } footer: {
-                Text(language.localized("Recommended workflow from the tutorial: build a machine-oriented image first, then use that resulting image reference in the Machines view."))
-            }
-
-            Section {
-                Text(language.localized("Starter Containerfile"))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                ScrollView {
-                    Text(machineStarterTemplate)
-                        .font(.system(size: 11, design: .monospaced))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
-                }
-                .frame(minHeight: 180, maxHeight: 220)
-            } footer: {
-                Text(language.localized("Starter example based on the tutorial's machine-image requirements: use a base image with `/sbin/init`, reset machine-id files, and boot to a non-GUI target. Save this as `Containerfile`, then build it from the Images view."))
             }
         }
         .formStyle(.grouped)
