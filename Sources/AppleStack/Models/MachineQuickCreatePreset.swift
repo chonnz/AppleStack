@@ -17,7 +17,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
         summary: "Best choice for daily development",
         baseImage: "ubuntu:24.04",
         defaultMachineName: "ubuntu-dev",
-        internalImageTag: "local/machine-ubuntu:24.04"
+        internalImageTag: "local/machine-ubuntu:24.04-v2"
     )
 
     static let all: [MachineSystemTemplate] = [
@@ -29,7 +29,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
             summary: "Use this when older packages are required",
             baseImage: "ubuntu:22.04",
             defaultMachineName: "ubuntu-22-dev",
-            internalImageTag: "local/machine-ubuntu:22.04"
+            internalImageTag: "local/machine-ubuntu:22.04-v2"
         ),
         .init(
             id: "debian-12",
@@ -38,7 +38,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
             summary: "Stable and lightweight Linux environment",
             baseImage: "debian:12",
             defaultMachineName: "debian-dev",
-            internalImageTag: "local/machine-debian:12"
+            internalImageTag: "local/machine-debian:12-v2"
         ),
     ]
 
@@ -50,11 +50,11 @@ struct MachineSystemTemplate: Identifiable, Equatable {
         ENV container docker
 
         RUN apt-get update && \
-            apt-get install -y systemd systemd-sysv dbus sudo iproute2 iputils-ping curl vim && \
+            apt-get install -y systemd systemd-sysv dbus sudo iproute2 iputils-ping curl vim openssh-server && \
             apt-get clean && \
-            rm -rf /var/lib/apt/lists/* && \
             : > /etc/machine-id && \
             : > /var/lib/dbus/machine-id && \
+            systemctl enable ssh.service && \
             systemctl mask systemd-firstboot.service systemd-resolved.service \
                 dev-hugepages.mount sys-fs-fuse-connections.mount \
                 systemd-remount-fs.service getty.target console-getty.service systemd-logind.service && \
