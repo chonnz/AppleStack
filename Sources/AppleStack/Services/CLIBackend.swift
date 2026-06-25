@@ -1562,7 +1562,7 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
     }
 
     static func bootMachineArguments(id: String) -> [String] {
-        ["machine", "run", "--name", id, "--detach"]
+        ["machine", "run", "--name", id, "--detach", "/bin/sleep", "infinity"]
     }
 
     static func runMachineArguments(id: String, command: [String]) -> [String] {
@@ -1621,12 +1621,8 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
     }
 
     static func removeMachineArguments(id: String, force: Bool) -> [String] {
-        var arguments = ["machine", "rm"]
-        if force {
-            arguments.append("--force")
-        }
-        arguments.append(id)
-        return arguments
+        // 当前 Apple container 的 machine rm/delete 不支持 --force。
+        ["machine", "rm", id]
     }
 
     /// 重启机器

@@ -471,24 +471,12 @@ struct MachineListView: View {
             try await prepareSystemTemplateIfNeeded(template)
 
             machineCreationStatus = "Creating virtual machine..."
-            let createConfig: MachineConfig = {
-                guard !config.noBoot else { return config }
-                var bootlessConfig = config
-                bootlessConfig.noBoot = true
-                return bootlessConfig
-            }()
-
             didStartCreateCommand = true
-            try await cliBackend.createMachine(config: createConfig) { chunk in
+            try await cliBackend.createMachine(config: config) { chunk in
                 Task { @MainActor in
                     machineCreationLog += chunk
                     updateMachineCreationStatus(from: chunk)
                 }
-            }
-
-            if !config.noBoot {
-                machineCreationStatus = "Starting virtual machine..."
-                try await cliBackend.startMachine(id: config.name)
             }
 
             await loadMachines()

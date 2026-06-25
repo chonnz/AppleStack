@@ -9,7 +9,7 @@ struct MachineQuickCreatePresetTests {
         #expect(template.title == "Ubuntu 24.04 LTS")
         #expect(template.badge == "Recommended")
         #expect(template.defaultMachineName == "ubuntu-dev")
-        #expect(template.internalImageTag == "applestack/machine-ubuntu:24.04")
+        #expect(template.internalImageTag == "local/machine-ubuntu:24.04")
     }
 
     @Test func standardPresetBuildsReadyToStartConfig() {
@@ -23,7 +23,7 @@ struct MachineQuickCreatePresetTests {
         )
 
         #expect(config.name == "dev")
-        #expect(config.image == "applestack/machine-ubuntu:24.04")
+        #expect(config.image == "local/machine-ubuntu:24.04")
         #expect(config.cpus == 4)
         #expect(config.memory == "4G")
         #expect(config.homeMount == "rw")
@@ -38,7 +38,7 @@ struct MachineQuickCreatePresetTests {
 
         #expect(options.contextDirectory == "/tmp/applestack-template")
         #expect(options.dockerfilePath == "/tmp/applestack-template/Containerfile")
-        #expect(options.tags == ["applestack/machine-ubuntu:24.04"])
+        #expect(options.tags == ["local/machine-ubuntu:24.04"])
         #expect(options.platform == "linux/arm64")
         #expect(options.dns == "8.8.8.8")
     }

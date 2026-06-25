@@ -17,7 +17,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
         summary: "Best choice for daily development",
         baseImage: "ubuntu:24.04",
         defaultMachineName: "ubuntu-dev",
-        internalImageTag: "applestack/machine-ubuntu:24.04"
+        internalImageTag: "local/machine-ubuntu:24.04"
     )
 
     static let all: [MachineSystemTemplate] = [
@@ -29,7 +29,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
             summary: "Use this when older packages are required",
             baseImage: "ubuntu:22.04",
             defaultMachineName: "ubuntu-22-dev",
-            internalImageTag: "applestack/machine-ubuntu:22.04"
+            internalImageTag: "local/machine-ubuntu:22.04"
         ),
         .init(
             id: "debian-12",
@@ -38,7 +38,7 @@ struct MachineSystemTemplate: Identifiable, Equatable {
             summary: "Stable and lightweight Linux environment",
             baseImage: "debian:12",
             defaultMachineName: "debian-dev",
-            internalImageTag: "applestack/machine-debian:12"
+            internalImageTag: "local/machine-debian:12"
         ),
     ]
 

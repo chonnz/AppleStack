@@ -29,8 +29,8 @@ struct CLIBackendCommandTests {
     @Test func machineArgumentsUseAvailableSubcommands() {
         #expect(CLIBackend.stopMachineArguments(id: "dev") == ["machine", "stop", "dev"])
         #expect(CLIBackend.removeMachineArguments(id: "dev", force: false) == ["machine", "rm", "dev"])
-        #expect(CLIBackend.removeMachineArguments(id: "dev", force: true) == ["machine", "rm", "--force", "dev"])
-        #expect(CLIBackend.bootMachineArguments(id: "dev") == ["machine", "run", "--name", "dev", "--detach"])
+        #expect(CLIBackend.removeMachineArguments(id: "dev", force: true) == ["machine", "rm", "dev"])
+        #expect(CLIBackend.bootMachineArguments(id: "dev") == ["machine", "run", "--name", "dev", "--detach", "/bin/sleep", "infinity"])
         #expect(CLIBackend.runMachineArguments(id: "dev", command: ["uname", "-a"]) == ["machine", "run", "--name", "dev", "--", "uname", "-a"])
     }
 
