@@ -54,8 +54,10 @@ final class ContainerListViewModel {
         }
     }
     
-    func loadContainers() async {
-        isLoading = true
+    func loadContainers(showLoading: Bool = true) async {
+        if showLoading || containers.isEmpty {
+            isLoading = true
+        }
         errorMessage = nil
         do {
             containers = try await service.listContainers(all: showAllContainers)
@@ -72,7 +74,7 @@ final class ContainerListViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(self?.refreshInterval ?? 10))
                 guard !Task.isCancelled else { break }
-                await self?.loadContainers()
+                await self?.loadContainers(showLoading: false)
             }
         }
     }
@@ -91,7 +93,7 @@ final class ContainerListViewModel {
         await runContainerAction(container) {
             try await service.startContainer(id: container.id)
             try await waitForContainer(id: container.id) { $0?.state == .running }
-            await loadContainers()
+            await loadContainers(showLoading: false)
         }
     }
     
@@ -102,7 +104,7 @@ final class ContainerListViewModel {
                 guard let found else { return true }
                 return found.state != .running
             }
-            await loadContainers()
+            await loadContainers(showLoading: false)
         }
     }
     
@@ -110,14 +112,14 @@ final class ContainerListViewModel {
         await runContainerAction(container) {
             try await service.removeContainer(id: container.id, force: force)
             try await waitForContainer(id: container.id) { $0 == nil }
-            await loadContainers()
+            await loadContainers(showLoading: false)
         }
     }
     
     func createContainer(config: ContainerConfig) async {
         do {
             _ = try await service.createContainer(config: config)
-            await loadContainers()
+            await loadContainers(showLoading: false)
             showCreateSheet = false
         } catch {
             errorMessage = ContainerServiceErrorPresenter.message(for: error)
@@ -142,14 +144,14 @@ final class ContainerListViewModel {
                 guard let found else { return true }
                 return found.state != .running
             }
-            await loadContainers()
+            await loadContainers(showLoading: false)
         }
     }
 
     func pruneStoppedContainers() async {
         do {
             try await service.pruneContainers()
-            await loadContainers()
+            await loadContainers(showLoading: false)
         } catch {
             errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
@@ -191,7 +193,7 @@ final class ContainerListViewModel {
         } catch {
             errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
-            await loadContainers()
+            await loadContainers(showLoading: false)
         }
     }
 

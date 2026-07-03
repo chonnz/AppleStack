@@ -75,7 +75,7 @@ struct SidebarView: View {
                 Divider()
             }
         }
-        .background(AppTheme.chromeBackground)
+        .background(AppTheme.sidebarBackground)
     }
 
     private func localized(_ value: String) -> String {

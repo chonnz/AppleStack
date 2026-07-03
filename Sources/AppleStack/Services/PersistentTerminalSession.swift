@@ -105,7 +105,7 @@ final class PersistentTerminalSession: ObservableObject {
         }
 
         guard let executablePath = Self.findContainerPath() else {
-            lastError = "未找到 `container` 命令。"
+            setTerminalError("未找到 `container` 命令。请在 Settings > CLI 配置正确路径。")
             return
         }
 
@@ -179,7 +179,7 @@ final class PersistentTerminalSession: ObservableObject {
             stdoutPipe.fileHandleForReading.readabilityHandler = nil
             stderrPipe.fileHandleForReading.readabilityHandler = nil
             self.isLaunching = false
-            self.lastError = error.localizedDescription
+            setTerminalError(error.localizedDescription)
         }
     }
 
@@ -210,7 +210,7 @@ final class PersistentTerminalSession: ObservableObject {
                     appendText("\n")
                 }
             } catch {
-                lastError = error.localizedDescription
+                setTerminalError(error.localizedDescription)
                 throw error
             }
             return
@@ -312,6 +312,12 @@ final class PersistentTerminalSession: ObservableObject {
         transcript += text
         trimTranscriptIfNeeded()
         persistState()
+    }
+
+    private func setTerminalError(_ message: String) {
+        lastError = message
+        let prefix = transcript.isEmpty || transcript.hasSuffix("\n") ? "" : "\n"
+        appendText("\(prefix)Error: \(message)\n")
     }
 
     private func loadPersistedState() {

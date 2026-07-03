@@ -75,4 +75,15 @@ enum ContainerServiceErrorPresenter {
 
         return "系统环境准备失败。\n\n\(baseMessage)\n\nContext: \(contextDirectory)\(logSuffix)"
     }
+
+    static func machineCreateMessage(
+        for error: Error,
+        createLog: String,
+        machineName: String
+    ) -> String {
+        let baseMessage = message(for: error)
+        let trimmedLog = createLog.trimmingCharacters(in: .whitespacesAndNewlines)
+        let logSuffix = trimmedLog.isEmpty ? "" : "\n\nCreate logs:\n\(trimmedLog)"
+        return "虚拟机 \(machineName) 创建失败。\n\n\(baseMessage)\(logSuffix)"
+    }
 }

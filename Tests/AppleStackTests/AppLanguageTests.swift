@@ -46,6 +46,13 @@ struct AppLanguageTests {
             "Creating virtual machine...": "正在创建虚拟机...",
             "Virtual machine is ready": "虚拟机已可用",
             "Please enter a machine name.": "请先填写虚拟机名称。",
+            "Open in Terminal": "在终端中打开",
+            "Paste from Mac Here": "从 Mac 粘贴到这里",
+            "More file actions": "更多文件操作",
+            "Open Settings": "打开设置",
+            "Create your first container": "创建第一个容器",
+            "Pull an image": "拉取镜像",
+            "Create your first machine": "创建第一个虚拟机",
         ]
 
         for (source, expected) in requiredTranslations {

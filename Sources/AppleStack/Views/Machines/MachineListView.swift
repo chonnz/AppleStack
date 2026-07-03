@@ -10,6 +10,17 @@ struct MachineListView: View {
         var id: String { value }
     }
 
+    private struct MachineCreateRecovery {
+        let machineName: String
+        let logs: String
+    }
+
+    private struct MachineCreatePreflightError: LocalizedError {
+        let message: String
+
+        var errorDescription: String? { message }
+    }
+
     private static let machineHomeMountOptions: [MachineHomeMountOption] = [
         .init(value: "", title: "Automatic", description: "Use the Apple container default home folder behavior"),
         .init(value: "rw", title: "Read & Write", description: "Mount your macOS home folder with write access"),
@@ -42,11 +53,12 @@ struct MachineListView: View {
     @State private var machineCreationStatus = "Preparing machine..."
     @State private var machineCreationLog = ""
     @State private var machineCreateInlineError: String?
+    @State private var machineCreateRecovery: MachineCreateRecovery?
     @State private var showMachineAdvancedOptions = false
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
     @State private var pendingMachineIDs: Set<String> = []
 
-    private let cliBackend = CLIBackend()
+    @Environment(\.cliBackend) private var cliBackend
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english
@@ -90,6 +102,13 @@ struct MachineListView: View {
                     Text(language.localized("No machines"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    Button {
+                        beginCreateMachine()
+                    } label: {
+                        Label(language.localized("Create your first machine"), systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredMachines.isEmpty {
@@ -372,6 +391,42 @@ struct MachineListView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
+
+                    if let visibleLog = visibleMachineCreationLog {
+                        Text(language.localized("Useful logs"))
+                            .font(.system(size: 12, weight: .semibold))
+                        ScrollView {
+                            Text(visibleLog)
+                                .font(.system(size: 11, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(8)
+                        }
+                        .frame(minHeight: 96, maxHeight: 160)
+                        .background(AppTheme.chromeBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(AppTheme.subtleBorder, lineWidth: 0.6)
+                        )
+                    }
+
+                    if machineCreateInlineError != nil, !isCreatingMachine {
+                        HStack {
+                            Button(language.localized("Retry")) {
+                                Task { await retryMachineCreate() }
+                            }
+
+                            if machineCreateRecovery != nil {
+                                Button(language.localized("Continue Start")) {
+                                    Task { await continueMachineStart() }
+                                }
+                                Button(language.localized("Show Logs")) {
+                                    showMachineCreateLogs()
+                                }
+                            }
+                        }
+                        .controlSize(.small)
+                    }
                 }
             }
         }
@@ -464,10 +519,12 @@ struct MachineListView: View {
         isCreatingMachine = true
         machineCreateInlineError = nil
         machineCreationLog = ""
+        machineCreateRecovery = nil
         machineCreationStatus = "Preparing system template..."
         var didStartCreateCommand = false
 
         do {
+            try await preflightMachineCreate(config)
             try await prepareSystemTemplateIfNeeded(template)
 
             machineCreationStatus = "Creating virtual machine..."
@@ -491,31 +548,61 @@ struct MachineListView: View {
             }
 
             if !didStartCreateCommand {
-                let message = "系统模板准备失败。请检查网络连接和 Apple container 是否正常运行后重试。"
+                let message: String
+                if error is MachineCreatePreflightError {
+                    message = error.localizedDescription
+                } else {
+                    message = ContainerServiceErrorPresenter.machineImageBuildMessage(
+                        for: error,
+                        buildLog: machineCreationLog,
+                        dockerfilePath: nil,
+                        contextDirectory: "AppleStackMachineTemplates/\(template.id)"
+                    )
+                }
                 machineCreateInlineError = message
                 machineCreationStatus = "System template failed"
                 errorMessage = message
             } else if machineWasCreated && !config.noBoot {
                 let bootLogs = try? await cliBackend.machineLogs(id: config.name, follow: false, tail: 120, boot: true)
                 let runtimeLogs = try? await cliBackend.machineLogs(id: config.name, follow: false, tail: 40, boot: false)
+                let recoveryLogs = [runtimeLogs, bootLogs]
+                    .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "\n")
                 let diagnostic = machineBootErrorMessage(
                     error: error,
                     bootLogs: bootLogs,
                     runtimeLogs: runtimeLogs,
                     failureHeadline: "虚拟机已创建，但启动失败。"
                 )
-                let bootFailureMessage = diagnostic + "\n\n你可以从列表里再次启动，或重新创建时打开“创建后暂不启动”。"
+                let bootFailureMessage = diagnostic + "\n\n你可以点击“继续启动”重试启动，或重新创建时打开“创建后暂不启动”。"
                 machineCreateInlineError = bootFailureMessage
+                machineCreateRecovery = MachineCreateRecovery(machineName: config.name, logs: recoveryLogs)
                 machineCreationStatus = "Start failed after create"
                 errorMessage = bootFailureMessage
             } else {
-                let message = "创建失败。请确认 Apple container 正常运行，然后重试。"
+                let message = ContainerServiceErrorPresenter.machineCreateMessage(
+                    for: error,
+                    createLog: machineCreationLog,
+                    machineName: config.name
+                )
                 machineCreateInlineError = message
                 machineCreationStatus = "Create failed"
                 errorMessage = message
             }
             isCreatingMachine = false
             return false
+        }
+    }
+
+    private func preflightMachineCreate(_ config: MachineConfig) async throws {
+        machineCreationStatus = "Checking container CLI and system status..."
+        _ = try await cliBackend.getSystemInfo()
+        let latestMachines = try await cliBackend.listMachines()
+        machines = latestMachines
+
+        if latestMachines.contains(where: { $0.id == config.name || $0.name == config.name }) {
+            throw MachineCreatePreflightError(message: "已存在名为 \(config.name) 的虚拟机。请从列表继续启动，或换一个名称后再创建。")
         }
     }
 
@@ -608,7 +695,62 @@ struct MachineListView: View {
         machineCreationStatus = "Preparing machine..."
         machineCreationLog = ""
         machineCreateInlineError = nil
+        machineCreateRecovery = nil
         showMachineAdvancedOptions = false
+    }
+
+    private var visibleMachineCreationLog: String? {
+        let trimmed = machineCreationLog.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.count <= 4_000 {
+            return trimmed
+        }
+        return String(trimmed.suffix(4_000))
+    }
+
+    private func retryMachineCreate() async {
+        let config = normalizedMachineConfig()
+        guard !config.name.isEmpty else {
+            machineCreateInlineError = language.localized("Please enter a machine name.")
+            machineCreationStatus = "Create failed"
+            return
+        }
+        _ = await createMachine(config, template: resolvedMachineTemplate)
+    }
+
+    private func continueMachineStart() async {
+        guard let recovery = machineCreateRecovery else { return }
+        isCreatingMachine = true
+        machineCreateInlineError = nil
+        machineCreationStatus = "Starting virtual machine..."
+        do {
+            try await cliBackend.startMachine(id: recovery.machineName)
+            try await waitForMachine(id: recovery.machineName) { $0?.status == .running }
+            await loadMachines()
+            machineCreationStatus = "Virtual machine is ready"
+            showCreateSheet = false
+            newMachine = MachineConfig()
+            resetMachineCreateState()
+        } catch {
+            let bootLogs = try? await cliBackend.machineLogs(id: recovery.machineName, follow: false, tail: 120, boot: true)
+            let runtimeLogs = try? await cliBackend.machineLogs(id: recovery.machineName, follow: false, tail: 40, boot: false)
+            let message = machineBootErrorMessage(
+                error: error,
+                bootLogs: bootLogs,
+                runtimeLogs: runtimeLogs,
+                failureHeadline: "启动虚拟机失败。"
+            )
+            machineCreateInlineError = message
+            machineCreationStatus = "Start failed after create"
+        }
+        isCreatingMachine = false
+    }
+
+    private func showMachineCreateLogs() {
+        let recoveryLogs = machineCreateRecovery?.logs.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        outputTitle = "Machine Logs"
+        outputText = recoveryLogs.isEmpty ? machineCreationLog : recoveryLogs
+        showOutputSheet = true
     }
 
     private func normalizedMachineConfig() -> MachineConfig {
@@ -755,7 +897,7 @@ struct MachineListView: View {
         pendingMachineIDs.insert(machine.id)
         defer { pendingMachineIDs.remove(machine.id) }
         do {
-            try await cliBackend.removeMachine(id: machine.id)
+            try await cliBackend.removeMachine(id: machine.id, force: false)
             try await waitForMachine(id: machine.id) { $0 == nil }
             if selectedMachine?.id == machine.id {
                 selectedMachine = nil
@@ -829,6 +971,7 @@ struct MachineListView: View {
             }
             try await Task.sleep(for: .milliseconds(700))
         }
+        throw CommandError.timeout
     }
 }
 

@@ -18,9 +18,8 @@ struct NetworkListView: View {
     @State private var showPruneConfirmation = false
     @State private var pendingNetworkIDs: Set<String> = []
     @State private var isNetworkActionRunning = false
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
-
-    private let cliBackend = CLIBackend()
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english

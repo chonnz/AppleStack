@@ -27,32 +27,38 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
     private let executor = CommandExecutor()
     private let containerPath: String
 
-    init() {
-        let configuredPath = UserDefaults.standard
-            .string(forKey: "cliPath")?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    var executablePath: String { containerPath }
 
-        if let configuredPath,
-           !configuredPath.isEmpty,
-           FileManager.default.isExecutableFile(atPath: configuredPath) {
-            self.containerPath = configuredPath
-        } else {
-            self.containerPath = Self.findContainerPath() ?? "/usr/local/bin/container"
+    init(configuredPath: String? = UserDefaults.standard.string(forKey: "cliPath")) {
+        self.containerPath = Self.resolvedContainerPath(configuredPath: configuredPath)
+    }
+
+    static func resolvedContainerPath(
+        configuredPath: String?,
+        fileManager: FileManager = .default
+    ) -> String {
+        let trimmedPath = configuredPath?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedPath,
+           !trimmedPath.isEmpty,
+           fileManager.isExecutableFile(atPath: trimmedPath) {
+            return trimmedPath
         }
+
+        return Self.findContainerPath(fileManager: fileManager) ?? "/usr/local/bin/container"
     }
 
     /// 查找 container 命令路径
-    private static func findContainerPath() -> String? {
+    private static func findContainerPath(fileManager: FileManager = .default) -> String? {
         let paths = [
             "/usr/local/bin/container",
             "/opt/homebrew/bin/container",
             "/usr/bin/container",
-            FileManager.default.homeDirectoryForCurrentUser
+            fileManager.homeDirectoryForCurrentUser
                 .appendingPathComponent(".local/bin/container").path,
         ]
 
         for path in paths {
-            if FileManager.default.isExecutableFile(atPath: path) {
+            if fileManager.isExecutableFile(atPath: path) {
                 return path
             }
         }
@@ -653,6 +659,20 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         )
     }
 
+    func exportContainer(
+        id: String,
+        outputPath: String? = nil,
+        onProgress: @Sendable @escaping (String) -> Void
+    ) async throws -> String {
+        let result = try await executor.executeStreaming(
+            containerPath,
+            arguments: Self.exportContainerArguments(id: id, outputPath: outputPath),
+            timeout: 900,
+            onOutput: onProgress
+        )
+        return result.stdout
+    }
+
     static func exportContainerArguments(id: String, outputPath: String?) -> [String] {
         var arguments = ["export"]
         if let outputPath, !outputPath.isEmpty {
@@ -670,6 +690,19 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         )
     }
 
+    func copyContainerPath(
+        source: String,
+        destination: String,
+        onProgress: @Sendable @escaping (String) -> Void
+    ) async throws {
+        _ = try await executor.executeStreaming(
+            containerPath,
+            arguments: Self.copyContainerArguments(source: source, destination: destination),
+            timeout: 900,
+            onOutput: onProgress
+        )
+    }
+
     static func copyContainerArguments(source: String, destination: String) -> [String] {
         ["copy", source, destination]
     }
@@ -679,6 +712,15 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         _ = try await executor.execute(
             containerPath,
             arguments: ["image", "pull", name]
+        )
+    }
+
+    func pullImage(name: String, onProgress: @Sendable @escaping (String) -> Void) async throws {
+        _ = try await executor.executeStreaming(
+            containerPath,
+            arguments: ["image", "pull", name],
+            timeout: 900,
+            onOutput: onProgress
         )
     }
 
@@ -707,6 +749,19 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         )
     }
 
+    func loadImage(
+        inputPath: String? = nil,
+        force: Bool = false,
+        onProgress: @Sendable @escaping (String) -> Void
+    ) async throws {
+        _ = try await executor.executeStreaming(
+            containerPath,
+            arguments: Self.loadImageArguments(inputPath: inputPath, force: force),
+            timeout: 900,
+            onOutput: onProgress
+        )
+    }
+
     static func loadImageArguments(inputPath: String?, force: Bool) -> [String] {
         var arguments = ["image", "load"]
         if let inputPath, !inputPath.isEmpty {
@@ -724,6 +779,21 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
             containerPath,
             arguments: Self.saveImageArguments(references: references, outputPath: outputPath, platform: platform)
         )
+    }
+
+    func saveImages(
+        references: [String],
+        outputPath: String? = nil,
+        platform: String? = nil,
+        onProgress: @Sendable @escaping (String) -> Void
+    ) async throws -> String {
+        let result = try await executor.executeStreaming(
+            containerPath,
+            arguments: Self.saveImageArguments(references: references, outputPath: outputPath, platform: platform),
+            timeout: 900,
+            onOutput: onProgress
+        )
+        return result.stdout
     }
 
     static func saveImageArguments(references: [String], outputPath: String?, platform: String?) -> [String] {
@@ -768,6 +838,19 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         _ = try await executor.execute(
             containerPath,
             arguments: Self.pushImageArguments(reference: reference, platform: platform)
+        )
+    }
+
+    func pushImage(
+        reference: String,
+        platform: String? = nil,
+        onProgress: @Sendable @escaping (String) -> Void
+    ) async throws {
+        _ = try await executor.executeStreaming(
+            containerPath,
+            arguments: Self.pushImageArguments(reference: reference, platform: platform),
+            timeout: 900,
+            onOutput: onProgress
         )
     }
 
@@ -853,6 +936,21 @@ final class CLIBackend: ContainerServiceProtocol, @unchecked Sendable {
         execContainerArguments(
             containerId: containerId,
             command: ["/bin/sh", "-lc", "LC_ALL=C ls -la \(shellQuote(path))"]
+        )
+    }
+
+    func listMachineDirectory(machineId: String, path: String) async throws -> [ContainerFileEntry] {
+        let output = try await executor.execute(
+            containerPath,
+            arguments: Self.listMachineDirectoryArguments(machineId: machineId, path: path)
+        )
+        return Self.parseContainerDirectoryOutput(output)
+    }
+
+    static func listMachineDirectoryArguments(machineId: String, path: String) -> [String] {
+        runMachineArguments(
+            id: machineId,
+            command: ["ls", "-la", path]
         )
     }
 

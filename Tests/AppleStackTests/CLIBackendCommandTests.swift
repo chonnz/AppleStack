@@ -24,6 +24,7 @@ struct CLIBackendCommandTests {
     @Test func terminalExecArgumentsDoNotDuplicateExecPrefix() {
         #expect(CLIBackend.execContainerArguments(containerId: "web", command: ["sh", "-lc", "pwd"]) == ["exec", "web", "sh", "-lc", "pwd"])
         #expect(CLIBackend.listContainerDirectoryArguments(containerId: "web", path: "/app data") == ["exec", "web", "/bin/sh", "-lc", "LC_ALL=C ls -la '/app data'"])
+        #expect(CLIBackend.listMachineDirectoryArguments(machineId: "dev", path: "/app data") == ["machine", "run", "--name", "dev", "--", "ls", "-la", "/app data"])
     }
 
     @Test func machineArgumentsUseAvailableSubcommands() {

@@ -18,8 +18,9 @@ enum AppTheme {
     static let accentColor = Color(hex: "#7D30A5")
     static let sidebarText = Color.primary
     static let sidebarGroupText = Color.secondary.opacity(0.75)
-    static let paneBackground = Color(nsColor: .textBackgroundColor)
-    static let chromeBackground = Color(nsColor: .windowBackgroundColor)
+    static let sidebarBackground = Color(nsColor: dynamicColor(light: "#F0EEF4", dark: "#252932"))
+    static let paneBackground = Color(nsColor: dynamicColor(light: "#FAFAFC", dark: "#1B1E26"))
+    static let chromeBackground = Color(nsColor: dynamicColor(light: "#FFFFFF", dark: "#20242C"))
     static let subtleBorder = Color(nsColor: .separatorColor).opacity(0.55)
     static let sidebarSelection = accentColor.opacity(0.18)
     static let sidebarHover = Color(nsColor: .quaternaryLabelColor).opacity(0.1)
@@ -31,11 +32,34 @@ enum AppTheme {
     static let detailTabSelectedBackground = Color(nsColor: .windowBackgroundColor)
     static let badgeBackground = accentColor.opacity(0.14)
     static let badgeForeground = accentColor
-    static let terminalBackground = Color(nsColor: .textBackgroundColor)
-    static let terminalSecondaryBackground = Color(nsColor: .controlBackgroundColor).opacity(0.72)
+    static let terminalBackground = Color(nsColor: dynamicColor(light: "#111214", dark: "#111214"))
+    static let terminalSecondaryBackground = Color(nsColor: dynamicColor(light: "#F3F1F6", dark: "#242832"))
     static let terminalBorder = Color(nsColor: .separatorColor).opacity(0.38)
+    static let terminalTextNSColor = NSColor(calibratedWhite: 0.88, alpha: 1)
+    static let fileBrowserBackground = Color(nsColor: dynamicColor(light: "#FFFFFF", dark: "#1E222B"))
+    static let fileBrowserRowBackground = Color(nsColor: dynamicColor(light: "#F4F2F7", dark: "#282C36"))
     // 侧边栏折叠后，系统红绿灯和侧边栏按钮会占用左上角区域，标题需要像 OrbStack 一样向右避让。
     static let windowControlsClearance: CGFloat = 142
+
+    private static func dynamicColor(light: String, dark: String) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return NSColor(hex: isDark ? dark : light)
+        }
+    }
+}
+
+private extension NSColor {
+    convenience init(hex: String) {
+        let trimmed = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        var value: UInt64 = 0
+        Scanner(string: trimmed).scanHexInt64(&value)
+
+        let red = CGFloat((value >> 16) & 0xFF) / 255
+        let green = CGFloat((value >> 8) & 0xFF) / 255
+        let blue = CGFloat(value & 0xFF) / 255
+        self.init(srgbRed: red, green: green, blue: blue, alpha: 1)
+    }
 }
 
 struct PaneHeader<Actions: View>: View {

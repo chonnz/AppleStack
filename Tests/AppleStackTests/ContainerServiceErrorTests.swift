@@ -59,4 +59,18 @@ struct ContainerServiceErrorTests {
         #expect(message.contains("Containerfile"))
         #expect(message.contains("/tmp/machine"))
     }
+
+    @Test func machineCreateMessageIncludesCommandErrorAndProgressLog() {
+        let error = CommandError.commandFailed(1, "failed to unpack image layer")
+
+        let message = ContainerServiceErrorPresenter.machineCreateMessage(
+            for: error,
+            createLog: "Fetching image\nfailed to unpack image layer",
+            machineName: "ubuntu-dev"
+        )
+
+        #expect(message.contains("ubuntu-dev"))
+        #expect(message.contains("failed to unpack image layer"))
+        #expect(message.contains("Create logs:"))
+    }
 }

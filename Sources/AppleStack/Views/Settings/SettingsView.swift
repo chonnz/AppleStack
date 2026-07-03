@@ -71,7 +71,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case (.english, .pathNotExecutable): "Path is not executable. AppleStack will fall back to auto-discovery on relaunch."
         case (.english, .containerPath): "container path"
         case (.english, .browse): "Browse..."
-        case (.english, .cliRelaunchHint): "Changing the CLI path applies after relaunch because the backend is created when AppleStack starts."
+        case (.english, .cliRelaunchHint): "Changing the CLI path refreshes AppleStack immediately."
         case (.english, .fontSize): "Font size"
         case (.english, .terminalFontHint): "Used by container and machine terminal tabs."
         case (.english, .runtime): "Runtime"
@@ -111,7 +111,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case (.simplifiedChinese, .pathNotExecutable): "当前路径不可执行，重启后将回退到自动查找。"
         case (.simplifiedChinese, .containerPath): "container 路径"
         case (.simplifiedChinese, .browse): "浏览..."
-        case (.simplifiedChinese, .cliRelaunchHint): "CLI 路径会在 AppleStack 下次启动时生效。"
+        case (.simplifiedChinese, .cliRelaunchHint): "CLI 路径修改后会立即刷新 AppleStack 后端。"
         case (.simplifiedChinese, .fontSize): "字体大小"
         case (.simplifiedChinese, .terminalFontHint): "用于容器和虚拟机的终端标签页。"
         case (.simplifiedChinese, .runtime): "运行状态"
@@ -149,6 +149,10 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Turn on Apple Containers before creating or running anything.": return "创建或运行任何内容前，先启动 Apple Containers。"
         case "Create a container": return "创建容器"
         case "Run an app from an image with only a name and image.": return "只需名称和镜像即可从镜像运行应用。"
+        case "Open Settings": return "打开设置"
+        case "Create your first container": return "创建第一个容器"
+        case "Pull an image": return "拉取镜像"
+        case "Create your first machine": return "创建第一个虚拟机"
         case "Create a virtual machine": return "创建虚拟机"
         case "Create a Linux machine from a preset image.": return "从预设镜像创建 Linux 虚拟机。"
         case "Open Activity Monitor": return "打开活动监视器"
@@ -431,6 +435,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Create but do not start yet": return "创建后暂不启动"
         case "Leave these unchanged unless you know you need different access or startup behavior.": return "除非你明确需要不同的访问或启动行为，否则保持默认即可。"
         case "You can leave this window open while AppleStack prepares and starts the machine.": return "AppleStack 准备并启动虚拟机时，请保持此窗口打开。"
+        case "Before the first run": return "首次使用前"
+        case "Confirm the `container` CLI path in Settings > CLI, start the system runtime, then use Quick Start to create your first container or Linux machine.": return "先在“设置 > CLI”确认 `container` 路径，再启动系统运行时，然后通过快速开始创建第一个容器或 Linux 虚拟机。"
+        case "Check CLI": return "检查 CLI"
+        case "Start runtime": return "启动运行时"
+        case "Use Quick Start": return "使用快速开始"
+        case "Got it": return "知道了"
+        case "Useful logs": return "有用日志"
+        case "Continue Start": return "继续启动"
+        case "Checking container CLI and system status...": return "正在检查 container CLI 和系统状态..."
         case "Preparing system template...": return "正在准备系统模板..."
         case "Preparing system components...": return "正在准备系统组件..."
         case "Downloading system components...": return "正在下载系统组件..."
@@ -505,6 +518,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Container Terminal": return "容器终端"
         case "Machine Terminal": return "虚拟机终端"
         case "Enter shell command": return "输入 Shell 命令"
+        case "This machine terminal runs one command at a time. Use macOS Terminal for a fully interactive shell.": return "虚拟机终端会逐条执行命令；如需完整交互式 Shell，请使用 macOS 终端。"
         case "Container is not running": return "容器未运行"
         case "Start the container to open a shell session.": return "启动容器后即可打开 Shell 会话。"
         case "Machine is not running": return "虚拟机未运行"
@@ -513,6 +527,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Container to Mac": return "容器到 Mac"
         case "Mac to Container": return "Mac 到容器"
         case "Container path": return "容器路径"
+        case "Machine path": return "虚拟机路径"
         case "Mac path": return "Mac 路径"
         case "Choose output folder": return "选择输出文件夹"
         case "Choose local file or folder": return "选择本地文件或文件夹"
@@ -540,13 +555,31 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "Clear terminal": return "清空终端"
         case "Copy terminal output": return "复制终端输出"
         case "Open in macOS Terminal": return "在 macOS 终端中打开"
+        case "Open in Terminal": return "在终端中打开"
+        case "Dismiss": return "关闭"
         case "Unavailable": return "不可用"
         case "Connecting...": return "连接中..."
         case "Connected": return "已连接"
         case "Disconnected": return "未连接"
         case "Filesystem": return "文件系统"
+        case "Quick folders": return "常用目录"
+        case "Root": return "根目录"
+        case "Home": return "主目录"
         case "Parent folder": return "上级文件夹"
+        case "Open Folder": return "打开文件夹"
+        case "Copy Path": return "复制路径"
+        case "Copy Container Reference": return "复制容器引用"
+        case "Copy Machine Reference": return "复制虚拟机引用"
+        case "Use as Copy Source": return "设为复制源"
+        case "Paste from Mac Here": return "从 Mac 粘贴到这里"
+        case "More file actions": return "更多文件操作"
+        case "Copy to Mac...": return "复制到 Mac..."
+        case "Copying files": return "正在复制文件"
+        case "Copy completed.": return "复制完成。"
+        case "Exporting container": return "正在导出容器"
+        case "Export completed.": return "导出完成。"
         case "Start the container to browse files.": return "启动容器后即可浏览文件。"
+        case "Start the machine to browse files.": return "启动虚拟机后即可浏览文件。"
         case "Loading files...": return "正在加载文件..."
         case "Cannot load files": return "无法加载文件"
         case "Empty folder": return "空文件夹"
@@ -558,6 +591,16 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case "File": return "文件"
         case "Symlink": return "符号链接"
         case "Directory browsing uses a shell listing inside the running container. Copy and export still use Apple Containers CLI operations.": return "目录浏览会在运行中的容器内执行 Shell 列表命令；复制和导出仍使用 Apple Containers CLI 操作。"
+        case "Pulling image": return "正在下载镜像"
+        case "Image pulled.": return "镜像下载完成。"
+        case "Loading image archive": return "正在加载镜像归档"
+        case "Image archive loaded.": return "镜像归档加载完成。"
+        case "Saving image": return "正在打包镜像"
+        case "Image saved.": return "镜像打包完成。"
+        case "Pushing image": return "正在推送镜像"
+        case "Image pushed.": return "镜像推送完成。"
+        case "Building image": return "正在构建镜像"
+        case "Image built.": return "镜像构建完成。"
         default: return value
         }
     }
@@ -607,6 +650,7 @@ enum SettingsTextKey {
 
 struct SettingsView: View {
     @Environment(\.cliBackend) private var cliBackend
+    var onCLIPathChanged: @MainActor () -> ContainerServiceProtocol = { ContainerServiceFactory.create() }
 
     @AppStorage("cliPath") private var cliPath = "/usr/local/bin/container"
     @AppStorage("refreshInterval") private var refreshInterval = 10.0
@@ -647,6 +691,9 @@ struct SettingsView: View {
             if systemViewModel == nil {
                 systemViewModel = SystemStatusViewModel(service: cliBackend)
             }
+        }
+        .onChange(of: cliPath) { _, _ in
+            refreshCLIBackend()
         }
     }
 
@@ -755,6 +802,9 @@ struct SettingsView: View {
                     TextField(language.text(.containerPath), text: $cliPath)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 12, design: .monospaced))
+                        .onSubmit {
+                            refreshCLIBackend()
+                        }
 
                     Button(language.text(.browse)) {
                         chooseCLIPath()
@@ -919,8 +969,17 @@ struct SettingsView: View {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
-            cliPath = url.path
+            if cliPath == url.path {
+                refreshCLIBackend()
+            } else {
+                cliPath = url.path
+            }
         }
+    }
+
+    private func refreshCLIBackend() {
+        let refreshedService = onCLIPathChanged()
+        systemViewModel = SystemStatusViewModel(service: refreshedService)
     }
 
     private func normalizeDefaults() {

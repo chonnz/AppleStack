@@ -334,21 +334,21 @@ struct ActivityMonitorView: View {
     private var resourceTable: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                groupRow(title: "Containers", icon: "shippingbox.fill", value: containerSummary, rowIndex: 0)
-                ForEach(Array(containers.enumerated()), id: \.element.id) { index, container in
-                    containerRow(container, index: index)
-                }
-
-                groupRow(title: "Engine", icon: "gearshape.fill", value: "", rowIndex: containers.count + 1)
-
-                groupRow(title: "Machines", icon: "desktopcomputer", value: machineSummary, rowIndex: containers.count + 2)
+                groupRow(title: "Machines", icon: "desktopcomputer", value: machineSummary, rowIndex: 0)
                 ForEach(Array(machines.enumerated()), id: \.element.id) { index, machine in
-                    machineRow(machine, index: index)
+                    machineRow(machine, index: index + 1)
                 }
+
+                groupRow(title: "Containers", icon: "shippingbox.fill", value: containerSummary, rowIndex: machines.count + 2)
+                ForEach(Array(containers.enumerated()), id: \.element.id) { index, container in
+                    containerRow(container, index: machines.count + index + 3)
+                }
+
+                groupRow(title: "Engine", icon: "gearshape.fill", value: "", rowIndex: machines.count + containers.count + 4)
 
                 ForEach(0..<8, id: \.self) { index in
                     Rectangle()
-                        .fill(index.isMultiple(of: 2) ? Color(nsColor: .controlBackgroundColor).opacity(0.45) : Color.clear)
+                        .fill(index.isMultiple(of: 2) ? Color(nsColor: .controlBackgroundColor).opacity(0.28) : Color.clear)
                         .frame(height: 24)
                 }
             }
@@ -462,6 +462,10 @@ struct ActivityMonitorView: View {
         .background(rowBackground(rowIndex: rowIndex, isSelected: isSelected))
         .contentShape(Rectangle())
         .onTapGesture(perform: action)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .opacity(isGroup ? 0.34 : 0.18)
+        }
     }
 
     private func metricText(_ text: String, width: CGFloat, isSelected: Bool) -> some View {
@@ -478,7 +482,7 @@ struct ActivityMonitorView: View {
             return AnyShapeStyle(AppTheme.listSelection)
         }
         if rowIndex.isMultiple(of: 2) {
-            return AnyShapeStyle(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+            return AnyShapeStyle(Color(nsColor: .controlBackgroundColor).opacity(0.30))
         }
         return AnyShapeStyle(Color.clear)
     }
@@ -491,7 +495,8 @@ struct ActivityMonitorView: View {
             summaryCard(title: language.localized("Disk:"), value: diskSummaryText, tint: .purple, history: displayedDiskHistory)
         }
         .padding(14)
-        .frame(height: 136)
+        .frame(height: 130)
+        .background(AppTheme.chromeBackground)
     }
 
     private var summaryTitlePrefix: String {
@@ -593,10 +598,10 @@ struct ActivityMonitorView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 108)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(AppTheme.paneBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(AppTheme.subtleBorder, lineWidth: 0.8)
+                .stroke(AppTheme.subtleBorder.opacity(0.72), lineWidth: 0.8)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }

@@ -9,6 +9,7 @@ struct QuickStartView: View {
     @State private var isStartingSystem = false
     @State private var errorMessage: String?
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
+    @AppStorage("hasSeenFirstLaunchGuide") private var hasSeenFirstLaunchGuide = false
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english
@@ -20,6 +21,10 @@ struct QuickStartView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if !hasSeenFirstLaunchGuide {
+                        firstLaunchGuide
+                    }
+
                     heroPanel
 
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 14)], spacing: 14) {
@@ -27,7 +32,8 @@ struct QuickStartView: View {
                             title: language.localized("Start the system"),
                             subtitle: language.localized("Turn on Apple Containers before creating or running anything."),
                             icon: "power",
-                            tint: ModuleTint.system,
+                            tint: AppTheme.accentColor,
+                            idleIconTint: .secondary,
                             isBusy: isStartingSystem,
                             action: startSystem
                         )
@@ -71,6 +77,55 @@ struct QuickStartView: View {
             }
         }
         .background(AppTheme.paneBackground)
+    }
+
+    private var firstLaunchGuide: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                SwiftUI.Image(systemName: "checklist")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(AppTheme.accentColor)
+                    .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(language.localized("Before the first run"))
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(language.localized("Confirm the `container` CLI path in Settings > CLI, start the system runtime, then use Quick Start to create your first container or Linux machine."))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    SettingsLink {
+                        Label(language.localized("Open Settings"), systemImage: "gearshape")
+                    }
+                    .controlSize(.small)
+
+                    Button(language.localized("Got it")) {
+                        hasSeenFirstLaunchGuide = true
+                    }
+                    .controlSize(.small)
+                }
+            }
+
+            HStack(spacing: 8) {
+                stepPill(number: "1", title: language.localized("Check CLI"))
+                stepPill(number: "2", title: language.localized("Start runtime"))
+                stepPill(number: "3", title: language.localized("Use Quick Start"))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppTheme.chromeBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppTheme.subtleBorder, lineWidth: 0.6)
+        )
     }
 
     private var heroPanel: some View {
@@ -143,6 +198,7 @@ struct QuickStartView: View {
         subtitle: String,
         icon: String,
         tint: Color,
+        idleIconTint: Color? = nil,
         isBusy: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
@@ -151,13 +207,14 @@ struct QuickStartView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(tint.opacity(0.13))
+                    SwiftUI.Image(systemName: icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(isBusy ? tint : (idleIconTint ?? tint))
+
                     if isBusy {
                         ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        SwiftUI.Image(systemName: icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(tint)
+                            .controlSize(.mini)
+                            .offset(x: 14, y: 14)
                     }
                 }
                 .frame(width: 42, height: 42)

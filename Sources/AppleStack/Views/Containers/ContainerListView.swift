@@ -8,6 +8,7 @@ struct ContainerListView: View {
     @State private var isSearchExpanded = false
     @State private var containerToDelete: Container?
     @State private var containerToKill: Container?
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private var language: AppLanguage {
@@ -36,6 +37,13 @@ struct ContainerListView: View {
                     Text(language.localized("No containers"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    Button {
+                        viewModel.showCreateSheet = true
+                    } label: {
+                        Label(language.localized("Create your first container"), systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .offset(y: -24)
@@ -100,7 +108,7 @@ struct ContainerListView: View {
                 Button(language.localized("Start System")) {
                     viewModel.showError = false
                     Task {
-                        try? await CLIBackend().systemStart()
+                        try? await cliBackend.systemStart()
                         await viewModel.loadContainers()
                     }
                 }

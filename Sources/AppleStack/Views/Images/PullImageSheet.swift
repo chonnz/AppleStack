@@ -3,7 +3,6 @@ import SwiftUI
 struct PullImageSheet: View {
     @Bindable var viewModel: ImageListViewModel
     @State private var imageName = ""
-    @State private var isPulling = false
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
@@ -39,21 +38,15 @@ struct PullImageSheet: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button {
-                    isPulling = true
+                    let name = imageName
+                    dismiss()
                     Task {
-                        await viewModel.pullImage(name: imageName)
-                        isPulling = false
-                        dismiss()
+                        await viewModel.pullImage(name: name)
                     }
                 } label: {
-                    if isPulling {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text(language.localized("Pull"))
-                    }
+                    Text(language.localized("Pull"))
                 }
-                .disabled(imageName.isEmpty || isPulling)
+                .disabled(imageName.isEmpty)
             }
         }
     }

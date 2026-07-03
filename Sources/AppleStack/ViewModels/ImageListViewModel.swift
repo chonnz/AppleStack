@@ -35,6 +35,7 @@ final class ImageListViewModel {
     var buildDNS = ""
     var pendingImageIDs: Set<String> = []
     var activeGlobalOperations = 0
+    var activeOperation: OperationProgress?
     
     var filteredImages: [Image] {
         guard !searchText.isEmpty else { return images }
@@ -88,7 +89,7 @@ final class ImageListViewModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
                 guard !Task.isCancelled else { break }
-                await self?.loadImages()
+                await self?.loadImages(showLoading: false)
             }
         }
     }
@@ -98,8 +99,10 @@ final class ImageListViewModel {
         refreshTask = nil
     }
     
-    func loadImages() async {
-        isLoading = true
+    func loadImages(showLoading: Bool = true) async {
+        if showLoading || images.isEmpty {
+            isLoading = true
+        }
         errorMessage = nil
         do {
             let loadedImages = try await service.listImages()
@@ -113,9 +116,12 @@ final class ImageListViewModel {
     }
     
     func pullImage(name: String) async {
-        await runGlobalOperation {
-            try await service.pullImage(name: name)
-            await loadImages()
+        await runGlobalOperation(title: "Pulling image", detail: name) {
+            try await service.pullImage(name: name) { [weak self] chunk in
+                Task { @MainActor in self?.appendOperationLog(chunk) }
+            }
+            finishOperation("Image pulled.")
+            await loadImages(showLoading: false)
         }
     }
     
@@ -129,7 +135,7 @@ final class ImageListViewModel {
         await runImageOperation(image) {
             try await service.removeImage(id: image.deleteTarget)
             try await waitForImage(id: image.id, reference: image.reference) { $0 == nil }
-            await loadImages()
+            await loadImages(showLoading: false)
         }
     }
 
@@ -144,15 +150,21 @@ final class ImageListViewModel {
     }
 
     func loadImage(from inputPath: String) async {
-        await runGlobalOperation {
-            try await service.loadImage(inputPath: inputPath, force: false)
-            await loadImages()
+        await runGlobalOperation(title: "Loading image archive", detail: inputPath) {
+            try await service.loadImage(inputPath: inputPath, force: false) { [weak self] chunk in
+                Task { @MainActor in self?.appendOperationLog(chunk) }
+            }
+            finishOperation("Image archive loaded.")
+            await loadImages(showLoading: false)
         }
     }
 
     func save(_ image: Image, to outputPath: String) async {
-        await runImageOperation(image) {
-            _ = try await service.saveImages(references: [image.reference], outputPath: outputPath, platform: nil)
+        await runImageOperation(image, title: "Saving image", detail: outputPath) {
+            _ = try await service.saveImages(references: [image.reference], outputPath: outputPath, platform: nil) { [weak self] chunk in
+                Task { @MainActor in self?.appendOperationLog(chunk) }
+            }
+            finishOperation("Image saved.")
         }
     }
 
@@ -162,14 +174,17 @@ final class ImageListViewModel {
             try await service.tagImage(source: image.reference, target: tagTarget)
             showTagSheet = false
             tagTarget = ""
-            await loadImages()
+            await loadImages(showLoading: false)
         }
     }
 
     func pushSelectedImage() async {
         guard let image = selectedImageForAction else { return }
-        await runImageOperation(image) {
-            try await service.pushImage(reference: image.reference, platform: pushPlatform.isEmpty ? nil : pushPlatform)
+        await runImageOperation(image, title: "Pushing image", detail: image.reference) {
+            try await service.pushImage(reference: image.reference, platform: pushPlatform.isEmpty ? nil : pushPlatform) { [weak self] chunk in
+                Task { @MainActor in self?.appendOperationLog(chunk) }
+            }
+            finishOperation("Image pushed.")
             showPushSheet = false
             pushPlatform = ""
         }
@@ -178,12 +193,12 @@ final class ImageListViewModel {
     func pruneImages() async {
         await runGlobalOperation {
             try await service.pruneImages(all: false)
-            await loadImages()
+            await loadImages(showLoading: false)
         }
     }
 
     func buildImage() async {
-        await runGlobalOperation {
+        await runGlobalOperation(title: "Building image", detail: buildContext) {
             let options = ImageBuildOptions(
                 contextDirectory: buildContext,
                 dockerfilePath: buildFile.isEmpty ? nil : buildFile,
@@ -194,17 +209,20 @@ final class ImageListViewModel {
                 noCache: false,
                 pull: false
             )
-            _ = try await service.buildImage(options: options)
+            try await service.buildImage(options: options) { [weak self] chunk in
+                Task { @MainActor in self?.appendOperationLog(chunk) }
+            }
             if let firstTag = options.tags.first, !firstTag.isEmpty {
                 UserDefaults.standard.set(firstTag, forKey: Self.lastBuiltMachineImageReferenceKey)
             }
+            finishOperation("Image built.")
             showBuildSheet = false
             buildContext = "."
             buildFile = ""
             buildTag = ""
             buildPlatform = ""
             buildDNS = ""
-            await loadImages()
+            await loadImages(showLoading: false)
         }
     }
 
@@ -292,31 +310,61 @@ final class ImageListViewModel {
         pendingImageIDs.contains(image.id)
     }
 
-    private func runGlobalOperation(_ operation: () async throws -> Void) async {
+    func clearCompletedOperation() {
+        guard activeOperation?.isRunning == false else { return }
+        activeOperation = nil
+    }
+
+    private func runGlobalOperation(
+        title: String? = nil,
+        detail: String? = nil,
+        operation: () async throws -> Void
+    ) async {
         activeGlobalOperations += 1
         errorMessage = nil
+        if let title, let detail {
+            activeOperation = OperationProgress(title: title, detail: detail)
+        }
         defer { activeGlobalOperations -= 1 }
         do {
             try await operation()
         } catch {
+            finishOperation(ContainerServiceErrorPresenter.message(for: error))
             errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
-            await loadImages()
+            await loadImages(showLoading: false)
         }
     }
 
-    private func runImageOperation(_ image: Image, operation: () async throws -> Void) async {
+    private func runImageOperation(
+        _ image: Image,
+        title: String? = nil,
+        detail: String? = nil,
+        operation: () async throws -> Void
+    ) async {
         guard !pendingImageIDs.contains(image.id) else { return }
         pendingImageIDs.insert(image.id)
         errorMessage = nil
+        if let title, let detail {
+            activeOperation = OperationProgress(title: title, detail: detail)
+        }
         defer { pendingImageIDs.remove(image.id) }
         do {
             try await operation()
         } catch {
+            finishOperation(ContainerServiceErrorPresenter.message(for: error))
             errorMessage = ContainerServiceErrorPresenter.message(for: error)
             showError = true
-            await loadImages()
+            await loadImages(showLoading: false)
         }
+    }
+
+    private func appendOperationLog(_ chunk: String) {
+        activeOperation?.append(chunk)
+    }
+
+    private func finishOperation(_ message: String) {
+        activeOperation?.finish(message)
     }
 
     private func waitForImage(

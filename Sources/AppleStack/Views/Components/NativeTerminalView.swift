@@ -22,9 +22,9 @@ struct NativeTerminalView: View {
 
     private let backgroundColor = AppTheme.terminalBackground
     private let borderColor = AppTheme.terminalBorder
-    private let promptColor = Color(nsColor: NSColor.systemGreen)
     private let terminalUserColor = NSColor.systemGreen
     private let terminalHostColor = NSColor.systemBlue
+    private let terminalForegroundColor = AppTheme.terminalTextNSColor
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english
@@ -32,6 +32,13 @@ struct NativeTerminalView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if isAvailable {
+                terminalStatusBar
+                if session.target.usesOneShotCommands {
+                    oneShotCommandNotice
+                }
+            }
+
             ZStack(alignment: .topTrailing) {
                 terminalSurface
 
@@ -49,6 +56,9 @@ struct NativeTerminalView: View {
             }
         }
         .background(backgroundColor)
+        .contextMenu {
+            terminalContextMenu
+        }
         .task(id: isAvailable) {
             guard isAvailable else {
                 session.close()
@@ -77,6 +87,103 @@ struct NativeTerminalView: View {
         }
     }
 
+    private var terminalStatusBar: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(session.isConnected ? Color.green : Color.orange)
+                .frame(width: 7, height: 7)
+
+            Text(sessionTitle)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Text(sessionSubtitle)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer()
+
+            Text(language.localized(session.isConnected ? "Connected" : session.isLaunching ? "Connecting..." : "Disconnected"))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(AppTheme.terminalSecondaryBackground)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(borderColor)
+        }
+    }
+
+    private var oneShotCommandNotice: some View {
+        HStack(alignment: .center, spacing: 8) {
+            SwiftUI.Image(systemName: "info.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(AppTheme.accentColor)
+
+            Text(language.localized("This machine terminal runs one command at a time. Use macOS Terminal for a fully interactive shell."))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 8)
+
+            Button {
+                openMacTerminal()
+            } label: {
+                Label(language.localized("Open in macOS Terminal"), systemImage: "macwindow")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .buttonStyle(.borderless)
+            .disabled(!isAvailable)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(AppTheme.terminalSecondaryBackground.opacity(0.82))
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(borderColor)
+        }
+    }
+
+    @ViewBuilder
+    private var terminalContextMenu: some View {
+        Button {
+            copyTranscript()
+        } label: {
+            Label(language.localized("Copy terminal output"), systemImage: "doc.on.doc")
+        }
+        .disabled(displayedTranscript.isEmpty)
+
+        Button {
+            clearTranscript()
+        } label: {
+            Label(language.localized("Clear terminal"), systemImage: "trash")
+        }
+        .disabled(session.transcript.isEmpty)
+
+        if isAvailable, !session.isConnected, !session.isLaunching {
+            Button {
+                session.activateIfNeeded()
+            } label: {
+                Label(language.localized("Connect"), systemImage: "bolt.horizontal")
+            }
+        }
+
+        if showsMacTerminalButton {
+            Divider()
+
+            Button {
+                openMacTerminal()
+            } label: {
+                Label(language.localized("Open in macOS Terminal"), systemImage: "macwindow")
+            }
+            .disabled(!isAvailable)
+        }
+    }
+
     @ViewBuilder
     private var terminalSurface: some View {
         if isAvailable {
@@ -91,7 +198,10 @@ struct NativeTerminalView: View {
                 onSubmit: submitCurrentCommand,
                 onHistoryUp: showPreviousCommand,
                 onHistoryDown: showNextCommand,
-                onClear: clearTranscript
+                onClear: clearTranscript,
+                onCopy: copyTranscript,
+                copyLabel: language.localized("Copy terminal output"),
+                clearLabel: language.localized("Clear terminal")
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
@@ -162,7 +272,7 @@ struct NativeTerminalView: View {
                 .foregroundStyle(.secondary)
             Text(unavailableTitle)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(isAvailable ? Color(nsColor: terminalForegroundColor) : .primary)
             Text(unavailableMessage)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
@@ -347,7 +457,7 @@ struct NativeTerminalView: View {
                 if commandLength > 0 {
                     attributed.addAttributes(
                         [
-                            .foregroundColor: NSColor.labelColor,
+                            .foregroundColor: terminalForegroundColor,
                             .font: semiboldFont,
                         ],
                         range: NSRange(location: commandStart, length: commandLength)
@@ -439,7 +549,7 @@ struct NativeTerminalView: View {
     private func parseANSIAttributedString(_ text: String) -> NSMutableAttributedString {
         let baseFont = NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .regular)
         let boldFont = NSFont.monospacedSystemFont(ofSize: CGFloat(terminalFontSize), weight: .semibold)
-        var currentColor: NSColor = .labelColor
+        var currentColor: NSColor = terminalForegroundColor
         var isBold = false
         let output = NSMutableAttributedString()
 
@@ -498,7 +608,7 @@ struct NativeTerminalView: View {
     private func applyANSICode(_ code: String, currentColor: inout NSColor, isBold: inout Bool) {
         let parts = code.split(separator: ";").compactMap { Int($0) }
         if parts.isEmpty {
-            currentColor = .labelColor
+            currentColor = terminalForegroundColor
             isBold = false
             return
         }
@@ -506,7 +616,7 @@ struct NativeTerminalView: View {
         for part in parts {
             switch part {
             case 0:
-                currentColor = .labelColor
+                currentColor = terminalForegroundColor
                 isBold = false
             case 1:
                 isBold = true
@@ -527,9 +637,9 @@ struct NativeTerminalView: View {
             case 36:
                 currentColor = .systemTeal
             case 37:
-                currentColor = .labelColor
+                currentColor = terminalForegroundColor
             case 39:
-                currentColor = .labelColor
+                currentColor = terminalForegroundColor
             case 90:
                 currentColor = .secondaryLabelColor
             case 91:
@@ -545,7 +655,7 @@ struct NativeTerminalView: View {
             case 96:
                 currentColor = NSColor.systemTeal.blended(withFraction: 0.18, of: .white) ?? .systemTeal
             case 97:
-                currentColor = .labelColor
+                currentColor = terminalForegroundColor
             default:
                 continue
             }
@@ -583,13 +693,20 @@ private struct TerminalConsoleView: NSViewRepresentable {
     let onHistoryUp: () -> Void
     let onHistoryDown: () -> Void
     let onClear: () -> Void
+    let onCopy: () -> Void
+    let copyLabel: String
+    let clearLabel: String
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             text: $command,
             onSubmit: onSubmit,
             onHistoryUp: onHistoryUp,
-            onHistoryDown: onHistoryDown
+            onHistoryDown: onHistoryDown,
+            onClear: onClear,
+            onCopy: onCopy,
+            copyLabel: copyLabel,
+            clearLabel: clearLabel
         )
     }
 
@@ -598,7 +715,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
         transcriptTextView.isEditable = false
         transcriptTextView.isSelectable = true
         transcriptTextView.drawsBackground = false
-        transcriptTextView.textColor = .labelColor
+        transcriptTextView.textColor = AppTheme.terminalTextNSColor
         transcriptTextView.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
         transcriptTextView.textContainerInset = NSSize(width: 0, height: 0)
         transcriptTextView.isRichText = false
@@ -612,6 +729,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
+        transcriptTextView.menu = context.coordinator.makeContextMenu()
 
         let promptLabel = NSTextField(labelWithString: prompt)
         promptLabel.font = .monospacedSystemFont(ofSize: fontSize, weight: .semibold)
@@ -624,11 +742,12 @@ private struct TerminalConsoleView: NSViewRepresentable {
         commandField.focusRingType = .none
         commandField.drawsBackground = false
         commandField.font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        commandField.textColor = .labelColor
+        commandField.textColor = AppTheme.terminalTextNSColor
         commandField.onSubmit = onSubmit
         commandField.onHistoryUp = onHistoryUp
         commandField.onHistoryDown = onHistoryDown
         commandField.onClear = onClear
+        commandField.menu = context.coordinator.makeContextMenu()
 
         let promptRow = NSStackView(views: [promptLabel, commandField])
         promptRow.orientation = .horizontal
@@ -706,7 +825,7 @@ private struct TerminalConsoleView: NSViewRepresentable {
 
         promptLabel.stringValue = prompt
         commandField.isEnabled = isEnabled
-        commandField.textColor = .labelColor
+        commandField.textColor = AppTheme.terminalTextNSColor
         commandField.placeholderAttributedString = NSAttributedString(
             string: placeholder,
             attributes: [.foregroundColor: NSColor.secondaryLabelColor]
@@ -757,6 +876,10 @@ private struct TerminalConsoleView: NSViewRepresentable {
         private let onSubmit: () -> Void
         private let onHistoryUp: () -> Void
         private let onHistoryDown: () -> Void
+        private let onClear: () -> Void
+        private let onCopy: () -> Void
+        private let copyLabel: String
+        private let clearLabel: String
 
         weak var textView: NSTextView?
         weak var commandField: TerminalCommandTextField?
@@ -769,12 +892,40 @@ private struct TerminalConsoleView: NSViewRepresentable {
             text: Binding<String>,
             onSubmit: @escaping () -> Void,
             onHistoryUp: @escaping () -> Void,
-            onHistoryDown: @escaping () -> Void
+            onHistoryDown: @escaping () -> Void,
+            onClear: @escaping () -> Void,
+            onCopy: @escaping () -> Void,
+            copyLabel: String,
+            clearLabel: String
         ) {
             self._text = text
             self.onSubmit = onSubmit
             self.onHistoryUp = onHistoryUp
             self.onHistoryDown = onHistoryDown
+            self.onClear = onClear
+            self.onCopy = onCopy
+            self.copyLabel = copyLabel
+            self.clearLabel = clearLabel
+        }
+
+        func makeContextMenu() -> NSMenu {
+            let menu = NSMenu()
+            let copyItem = NSMenuItem(title: copyLabel, action: #selector(copyTerminalOutput), keyEquivalent: "")
+            copyItem.target = self
+            menu.addItem(copyItem)
+
+            let clearItem = NSMenuItem(title: clearLabel, action: #selector(clearTerminal), keyEquivalent: "")
+            clearItem.target = self
+            menu.addItem(clearItem)
+            return menu
+        }
+
+        @objc private func copyTerminalOutput() {
+            onCopy()
+        }
+
+        @objc private func clearTerminal() {
+            onClear()
         }
 
         func controlTextDidChange(_ notification: Notification) {

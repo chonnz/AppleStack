@@ -249,7 +249,7 @@ private struct DetailPanel: View {
         case .containers:
             ["Info", "Runtime", "Network", "Logs", "Terminal", "Files", "Stats", "Inspect"]
         case .machines:
-            ["Info", "Resources", "Terminal", "Inspect"]
+            ["Info", "Resources", "Terminal", "Files", "Inspect"]
         case .images:
             ["Info", "Config", "History", "Inspect"]
         case .volumes:
@@ -440,6 +440,7 @@ private struct ImageDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var rawInspectOutput: String?
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private var language: AppLanguage {
@@ -498,7 +499,7 @@ private struct ImageDetailView: View {
         errorMessage = nil
 
         do {
-            let output = try await CLIBackend().inspectImages(references: [image.reference])
+            let output = try await cliBackend.inspectImages(references: [image.reference])
             rawInspectOutput = output
             details = try ImageInspectionDetails.parse(from: output, fallback: image)
         } catch {
@@ -517,7 +518,7 @@ private struct ImageDetailView: View {
         if panel.runModal() == .OK, let url = panel.url {
             Task {
                 do {
-                    _ = try await CLIBackend().saveImages(
+                    _ = try await cliBackend.saveImages(
                         references: [image.reference],
                         outputPath: url.path,
                         platform: nil

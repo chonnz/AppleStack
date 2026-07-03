@@ -7,6 +7,7 @@ struct ImageListView: View {
     var onToggleSidebar: () -> Void = {}
     @State private var isSearchExpanded = false
     @State private var imageToDelete: Image?
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
 
     private var language: AppLanguage {
@@ -24,6 +25,14 @@ struct ImageListView: View {
                 headerActions
             }
 
+            if let progress = viewModel.activeOperation {
+                OperationProgressView(progress: progress) {
+                    viewModel.clearCompletedOperation()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+            }
+
             if viewModel.isLoading && viewModel.images.isEmpty {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -35,6 +44,13 @@ struct ImageListView: View {
                     Text(language.localized("No images"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.secondary)
+                    Button {
+                        viewModel.showPullSheet = true
+                    } label: {
+                        Label(language.localized("Pull an image"), systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -136,7 +152,7 @@ struct ImageListView: View {
                 Button(language.localized("Start System")) {
                     viewModel.showError = false
                     Task {
-                        try? await CLIBackend().systemStart()
+                        try? await cliBackend.systemStart()
                         await viewModel.loadImages()
                     }
                 }
@@ -343,7 +359,10 @@ private struct BuildImageSheet: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button(language.localized("Cancel")) { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {
-                Button(language.localized("Build")) { Task { await viewModel.buildImage() } }
+                Button(language.localized("Build")) {
+                    dismiss()
+                    Task { await viewModel.buildImage() }
+                }
                     .disabled(viewModel.buildContext.isEmpty)
             }
         }

@@ -29,14 +29,71 @@ protocol ContainerServiceProtocol: Sendable {
     /// 获取网络列表
     func listNetworks() async throws -> [Network]
 
+    /// 创建网络
+    func createNetwork(config: NetworkConfig) async throws
+
+    /// 删除网络
+    func removeNetwork(id: String) async throws
+
+    /// 查看网络详情
+    func inspectNetworks(ids: [String]) async throws -> String
+
+    /// 清理未使用网络
+    func pruneNetworks() async throws
+
     /// 获取卷列表
     func listVolumes() async throws -> [String]
+
+    /// 创建卷
+    func createVolume(name: String) async throws
+
+    /// 删除卷
+    func removeVolume(name: String) async throws
+
+    /// 查看卷详情
+    func inspectVolumes(names: [String]) async throws -> String
+
+    /// 清理未使用卷
+    func pruneVolumes() async throws
 
     /// 获取虚拟机列表
     func listMachines() async throws -> [Machine]
 
+    /// 创建虚拟机
+    func createMachine(config: MachineConfig) async throws
+
+    /// 流式创建虚拟机
+    func createMachine(config: MachineConfig, onProgress: @Sendable @escaping (String) -> Void) async throws
+
+    /// 启动虚拟机
+    func startMachine(id: String) async throws
+
+    /// 停止虚拟机
+    func stopMachine(id: String) async throws
+
+    /// 删除虚拟机
+    func removeMachine(id: String, force: Bool) async throws
+
+    /// 查看虚拟机详情
+    func inspectMachine(id: String?) async throws -> String
+
+    /// 获取虚拟机日志
+    func machineLogs(id: String?, follow: Bool, tail: Int?, boot: Bool) async throws -> String
+
+    /// 列出虚拟机内目录
+    func listMachineDirectory(machineId: String, path: String) async throws -> [ContainerFileEntry]
+
+    /// 配置虚拟机资源
+    func setMachine(id: String, cpus: Int?, memory: String?, homeMount: String?) async throws
+
+    /// 设置默认虚拟机
+    func setDefaultMachine(id: String) async throws
+
     /// 查看容器详情
     func inspectContainers(ids: [String]) async throws -> String
+
+    /// 列出容器内目录
+    func listContainerDirectory(containerId: String, path: String) async throws -> [ContainerFileEntry]
 
     /// 终止容器
     func killContainers(ids: [String], signal: String?, all: Bool) async throws
@@ -47,11 +104,20 @@ protocol ContainerServiceProtocol: Sendable {
     /// 导出容器文件系统
     func exportContainer(id: String, outputPath: String?) async throws -> String
 
+    /// 流式导出容器文件系统
+    func exportContainer(id: String, outputPath: String?, onProgress: @Sendable @escaping (String) -> Void) async throws -> String
+
     /// 复制容器与本机之间的文件
     func copyContainerPath(source: String, destination: String) async throws
 
+    /// 流式复制容器与本机之间的文件
+    func copyContainerPath(source: String, destination: String, onProgress: @Sendable @escaping (String) -> Void) async throws
+
     /// 拉取镜像
     func pullImage(name: String) async throws
+
+    /// 流式拉取镜像
+    func pullImage(name: String, onProgress: @Sendable @escaping (String) -> Void) async throws
 
     /// 删除镜像
     func removeImage(id: String) async throws
@@ -62,8 +128,14 @@ protocol ContainerServiceProtocol: Sendable {
     /// 加载镜像归档
     func loadImage(inputPath: String?, force: Bool) async throws
 
+    /// 流式加载镜像归档
+    func loadImage(inputPath: String?, force: Bool, onProgress: @Sendable @escaping (String) -> Void) async throws
+
     /// 保存镜像归档
     func saveImages(references: [String], outputPath: String?, platform: String?) async throws -> String
+
+    /// 流式保存镜像归档
+    func saveImages(references: [String], outputPath: String?, platform: String?, onProgress: @Sendable @escaping (String) -> Void) async throws -> String
 
     /// 标记镜像
     func tagImage(source: String, target: String) async throws
@@ -74,8 +146,14 @@ protocol ContainerServiceProtocol: Sendable {
     /// 推送镜像
     func pushImage(reference: String, platform: String?) async throws
 
+    /// 流式推送镜像
+    func pushImage(reference: String, platform: String?, onProgress: @Sendable @escaping (String) -> Void) async throws
+
     /// 构建镜像
     func buildImage(options: ImageBuildOptions) async throws -> String
+
+    /// 流式构建镜像
+    func buildImage(options: ImageBuildOptions, onProgress: @Sendable @escaping (String) -> Void) async throws
 
     /// 执行容器命令
     func execCommand(containerId: String, command: [String]) async throws -> String

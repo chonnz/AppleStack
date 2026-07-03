@@ -8,9 +8,8 @@ struct NetworkDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var rawInspectOutput: String?
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
-
-    private let cliBackend = CLIBackend()
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english

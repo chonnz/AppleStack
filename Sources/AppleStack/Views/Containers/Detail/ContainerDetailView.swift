@@ -4,7 +4,7 @@ struct ContainerDetailView: View {
     let container: Container
     let selectedTab: String
 
-    @State private var logViewModel: LogStreamViewModel
+    @State private var logViewModel: LogStreamViewModel?
     @StateObject private var terminalSession: PersistentTerminalSession
     @State private var details: ContainerInspectionDetails?
     @State private var isLoadingInfo = false
@@ -14,6 +14,7 @@ struct ContainerDetailView: View {
     @State private var localPath = ""
     @State private var copyDirection: FileCopyDirection = .fromContainer
     @State private var fileActionStatus: String?
+    @State private var fileOperationProgress: OperationProgress?
     @State private var isRunningFileAction = false
     @State private var browserPath = "/"
     @State private var fileEntries: [ContainerFileEntry] = []
@@ -21,9 +22,8 @@ struct ContainerDetailView: View {
     @State private var fileBrowserError: String?
     @State private var showsFileTransfer = false
     @State private var logSearchText = ""
+    @Environment(\.cliBackend) private var cliBackend
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.english.rawValue
-
-    private let cliBackend = CLIBackend()
 
     private var language: AppLanguage {
         AppLanguage(rawValue: appLanguageRaw) ?? .english
@@ -32,10 +32,6 @@ struct ContainerDetailView: View {
     init(container: Container, selectedTab: String = "Info") {
         self.container = container
         self.selectedTab = selectedTab
-        self._logViewModel = State(initialValue: LogStreamViewModel(
-            service: CLIBackend(),
-            containerId: container.id
-        ))
         self._terminalSession = StateObject(wrappedValue: PersistentTerminalSession(
             target: .container(id: container.id)
         ))
@@ -65,13 +61,13 @@ struct ContainerDetailView: View {
         .background(AppTheme.paneBackground)
         .task(id: container.id) {
             guard container.status == .running else { return }
-            await ContainerStatsStore.preloadIfNeeded(containerId: container.id)
+            await ContainerStatsStore.preloadIfNeeded(containerId: container.id, service: cliBackend)
         }
         .task(id: selectedTab) {
             if ["Info", "Runtime", "Network", "Inspect"].contains(selectedTab), details == nil {
                 await loadDetails()
             } else if selectedTab == "Logs" {
-                await logViewModel.loadLogs()
+                await loadLogs()
             } else if selectedTab == "Files" {
                 await loadContainerDirectory()
             }
@@ -250,52 +246,57 @@ struct ContainerDetailView: View {
         VStack(spacing: 0) {
             logsToolbar
 
-            if logViewModel.isLoading {
+            if let logViewModel {
+                if logViewModel.isLoading {
+                    ProgressView(language.localized("Loading logs..."))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error = logViewModel.errorMessage {
+                    VStack(spacing: 12) {
+                        SwiftUI.Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button(language.localized("Retry")) {
+                            Task { @MainActor in
+                                await loadLogs()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                } else if logViewModel.logs.isEmpty {
+                    VStack(spacing: 12) {
+                        SwiftUI.Image(systemName: "doc.text")
+                            .font(.system(size: 48))
+                            .foregroundStyle(.secondary)
+                        Text(language.localized("No logs"))
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if filteredLogEntries.isEmpty {
+                    VStack(spacing: 12) {
+                        SwiftUI.Image(systemName: "magnifyingglass")
+                            .font(.system(size: 38))
+                            .foregroundStyle(.tertiary)
+                        Text(language.localized("No matching logs"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .background(Color(nsColor: .textBackgroundColor))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    LogsConsoleTextView(text: filteredLogText, scrollsToBottom: logViewModel.autoScroll)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
                 ProgressView(language.localized("Loading logs..."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error = logViewModel.errorMessage {
-                VStack(spacing: 12) {
-                    SwiftUI.Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.orange)
-                    Text(error)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    Button(language.localized("Retry")) {
-                        Task { @MainActor in
-                            await logViewModel.loadLogs()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
-            } else if logViewModel.logs.isEmpty {
-                VStack(spacing: 12) {
-                    SwiftUI.Image(systemName: "doc.text")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                    Text(language.localized("No logs"))
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                }
-                .background(Color(nsColor: .textBackgroundColor))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if filteredLogEntries.isEmpty {
-                VStack(spacing: 12) {
-                    SwiftUI.Image(systemName: "magnifyingglass")
-                        .font(.system(size: 38))
-                        .foregroundStyle(.tertiary)
-                    Text(language.localized("No matching logs"))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .background(Color(nsColor: .textBackgroundColor))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                LogsConsoleTextView(text: filteredLogText, scrollsToBottom: logViewModel.autoScroll)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -333,32 +334,35 @@ struct ContainerDetailView: View {
 
             logToolbarButton("arrow.clockwise", help: language.localized("Refresh logs")) {
                 Task { @MainActor in
-                    await logViewModel.loadLogs()
+                    await loadLogs()
                 }
             }
-            .disabled(logViewModel.isLoading)
+            .disabled(logViewModel?.isLoading == true)
 
-            logToolbarButton(logViewModel.isStreaming ? "stop.fill" : "play.fill", help: language.localized(logViewModel.isStreaming ? "Stop following logs" : "Follow logs")) {
-                if logViewModel.isStreaming {
-                    logViewModel.stopStreaming()
+            logToolbarButton(logViewModel?.isStreaming == true ? "stop.fill" : "play.fill", help: language.localized(logViewModel?.isStreaming == true ? "Stop following logs" : "Follow logs")) {
+                if logViewModel?.isStreaming == true {
+                    logViewModel?.stopStreaming()
                 } else {
-                    logViewModel.startStreaming()
+                    logViewModel?.startStreaming()
                 }
             }
-            .foregroundStyle(logViewModel.isStreaming ? .red : .secondary)
+            .foregroundStyle(logViewModel?.isStreaming == true ? .red : .secondary)
+            .disabled(logViewModel == nil)
 
-            logToolbarButton(logViewModel.autoScroll ? "arrow.down.to.line.compact" : "arrow.down.to.line", help: language.localized("Toggle auto-scroll")) {
-                logViewModel.autoScroll.toggle()
+            logToolbarButton(logViewModel?.autoScroll == true ? "arrow.down.to.line.compact" : "arrow.down.to.line", help: language.localized("Toggle auto-scroll")) {
+                logViewModel?.autoScroll.toggle()
             }
-            .foregroundStyle(logViewModel.autoScroll ? AppTheme.accentColor : .secondary)
+            .foregroundStyle(logViewModel?.autoScroll == true ? AppTheme.accentColor : .secondary)
+            .disabled(logViewModel == nil)
 
             logToolbarButton("doc.on.doc", help: language.localized("Copy logs")) {
                 copyLogsToClipboard()
             }
 
             logToolbarButton("trash", help: language.localized("Clear logs")) {
-                logViewModel.clearLogs()
+                logViewModel?.clearLogs()
             }
+            .disabled(logViewModel == nil)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -397,155 +401,201 @@ struct ContainerDetailView: View {
     // MARK: - Files Tab
 
     private var filesView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                InspectorSection(title: language.localized("Filesystem")) {
-                    InspectorCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 8) {
-                                TextField(language.localized("Container path"), text: $browserPath)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .onSubmit {
-                                        Task { await loadContainerDirectory() }
-                                    }
+        VStack(spacing: 0) {
+            fileBrowserToolbar
 
-                                Button {
-                                    browserPath = parentPath(of: browserPath)
-                                    Task { await loadContainerDirectory() }
-                                } label: {
-                                    SwiftUI.Image(systemName: "arrow.up")
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(browserPath == "/" || isLoadingFiles)
-                                .help(language.localized("Parent folder"))
-
-                                Button {
-                                    Task { await loadContainerDirectory() }
-                                } label: {
-                                    SwiftUI.Image(systemName: "arrow.clockwise")
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(isLoadingFiles)
-                                .help(language.localized("Refresh"))
-                            }
-
-                            if container.status != .running {
-                                emptyFilesMessage(
-                                    icon: "powerplug",
-                                    title: language.localized("Container is not running"),
-                                    message: language.localized("Start the container to browse files.")
-                                )
-                            } else if isLoadingFiles {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                    Text(language.localized("Loading files..."))
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 12)
-                            } else if let fileBrowserError {
-                                emptyFilesMessage(
-                                    icon: "exclamationmark.triangle",
-                                    title: language.localized("Cannot load files"),
-                                    message: fileBrowserError
-                                )
-                            } else if fileEntries.isEmpty {
-                                emptyFilesMessage(
-                                    icon: "folder",
-                                    title: language.localized("Empty folder"),
-                                    message: language.localized("No files in this directory.")
-                                )
-                            } else {
-                                VStack(spacing: 0) {
-                                    fileBrowserHeader
-                                    ForEach(Array(fileEntries.enumerated()), id: \.element.id) { index, entry in
-                                        fileEntryRow(entry, rowIndex: index)
-                                    }
-                                }
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .stroke(AppTheme.subtleBorder, lineWidth: 0.5)
-                                )
-                            }
-                        }
-                    }
+            if let progress = fileOperationProgress {
+                OperationProgressView(progress: progress) {
+                    clearFileOperationProgress()
                 }
-
-                InspectorSection(title: language.localized("Copy and Export")) {
-                    InspectorCard {
-                        DisclosureGroup(isExpanded: $showsFileTransfer) {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Picker(language.localized("Direction"), selection: $copyDirection) {
-                                    Text(language.localized("Container to Mac")).tag(FileCopyDirection.fromContainer)
-                                    Text(language.localized("Mac to Container")).tag(FileCopyDirection.toContainer)
-                                }
-                                .pickerStyle(.segmented)
-
-                                TextField(language.localized("Container path"), text: $containerPath)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 12, design: .monospaced))
-
-                                HStack(spacing: 8) {
-                                    TextField(language.localized("Mac path"), text: $localPath)
-                                        .textFieldStyle(.roundedBorder)
-                                        .font(.system(size: 12, design: .monospaced))
-
-                                    Button {
-                                        chooseLocalPath()
-                                    } label: {
-                                        SwiftUI.Image(systemName: copyDirection == .fromContainer ? "folder.badge.plus" : "folder")
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .help(language.localized(copyDirection == .fromContainer ? "Choose output folder" : "Choose local file or folder"))
-                                }
-
-                                HStack {
-                                    Button {
-                                        Task { await copyFiles() }
-                                    } label: {
-                                        Label(language.localized("Copy"), systemImage: "doc.on.doc")
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .disabled(!canCopyFiles || isRunningFileAction)
-
-                                    Button {
-                                        exportContainer()
-                                    } label: {
-                                        Label(language.localized("Export Filesystem"), systemImage: "square.and.arrow.up")
-                                    }
-                                    .buttonStyle(.bordered)
-
-                                    if isRunningFileAction {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                    }
-
-                                    Spacer()
-                                }
-
-                                if let fileActionStatus {
-                                    Text(fileActionStatus)
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
-                                        .textSelection(.enabled)
-                                }
-                            }
-                            .padding(.top, 10)
-                        } label: {
-                            Text(language.localized("Show copy and export tools"))
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                }
-
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
             }
-            .padding(16)
+
+            fileBrowserContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if showsFileTransfer {
+                Divider()
+                fileTransferPanel
+            }
         }
         .background(AppTheme.paneBackground)
+    }
+
+    private var fileBrowserToolbar: some View {
+        HStack(spacing: 8) {
+            TextField(language.localized("Container path"), text: $browserPath)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(AppTheme.fileBrowserBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .onSubmit {
+                    Task { await loadContainerDirectory() }
+                }
+
+            fileToolbarButton("arrow.up", help: language.localized("Parent folder")) {
+                browserPath = parentPath(of: browserPath)
+                Task { await loadContainerDirectory() }
+            }
+            .disabled(browserPath == "/" || isLoadingFiles || container.status != .running)
+
+            fileToolbarButton("arrow.clockwise", help: language.localized("Refresh")) {
+                Task { await loadContainerDirectory() }
+            }
+            .disabled(isLoadingFiles || container.status != .running)
+
+            if isLoadingFiles, !fileEntries.isEmpty {
+                ProgressView()
+                    .controlSize(.small)
+                    .padding(.horizontal, 4)
+            }
+
+            Menu {
+                Button {
+                    showsFileTransfer.toggle()
+                } label: {
+                    Label(language.localized("Copy and Export"), systemImage: "doc.on.doc")
+                }
+
+                Button {
+                    exportContainer()
+                } label: {
+                    Label(language.localized("Export Filesystem"), systemImage: "square.and.arrow.up")
+                }
+                .disabled(isRunningFileAction)
+            } label: {
+                SwiftUI.Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 26, height: 26)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(language.localized("More file actions"))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(AppTheme.paneBackground)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    @ViewBuilder
+    private var fileBrowserContent: some View {
+        if container.status != .running {
+            emptyFilesMessage(
+                icon: "powerplug",
+                title: language.localized("Container is not running"),
+                message: language.localized("Start the container to browse files.")
+            )
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if isLoadingFiles && fileEntries.isEmpty {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(language.localized("Loading files..."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppTheme.fileBrowserBackground)
+        } else if let fileBrowserError {
+            emptyFilesMessage(
+                icon: "exclamationmark.triangle",
+                title: language.localized("Cannot load files"),
+                message: fileBrowserError
+            )
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if fileEntries.isEmpty {
+            emptyFilesMessage(
+                icon: "folder",
+                title: language.localized("Empty folder"),
+                message: language.localized("No files in this directory.")
+            )
+            .padding(14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    Section {
+                        ForEach(Array(fileEntries.enumerated()), id: \.element.id) { index, entry in
+                            fileEntryRow(entry, rowIndex: index)
+                        }
+                    } header: {
+                        fileBrowserHeader
+                    }
+                }
+            }
+                    .background(AppTheme.fileBrowserBackground)
+        }
+    }
+
+    private var fileTransferPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Picker(language.localized("Direction"), selection: $copyDirection) {
+                Text(language.localized("Container to Mac")).tag(FileCopyDirection.fromContainer)
+                Text(language.localized("Mac to Container")).tag(FileCopyDirection.toContainer)
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 8) {
+                TextField(language.localized("Container path"), text: $containerPath)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+
+                TextField(language.localized("Mac path"), text: $localPath)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+
+                Button {
+                    chooseLocalPath()
+                } label: {
+                    SwiftUI.Image(systemName: copyDirection == .fromContainer ? "folder.badge.plus" : "folder")
+                }
+                .buttonStyle(.bordered)
+                .help(language.localized(copyDirection == .fromContainer ? "Choose output folder" : "Choose local file or folder"))
+
+                Button {
+                    Task { await copyFiles() }
+                } label: {
+                    Label(language.localized("Copy"), systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canCopyFiles || isRunningFileAction)
+            }
+
+            if isRunningFileAction {
+                ProgressView()
+                    .controlSize(.small)
+            }
+
+            if let fileActionStatus {
+                Text(fileActionStatus)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .background(AppTheme.chromeBackground)
+    }
+
+    private func fileToolbarButton(_ systemName: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            SwiftUI.Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help(help)
     }
 
     private var fileBrowserHeader: some View {
@@ -563,7 +613,7 @@ struct ContainerDetailView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(AppTheme.terminalSecondaryBackground)
+        .background(AppTheme.fileBrowserRowBackground)
     }
 
     private func fileEntryRow(_ entry: ContainerFileEntry, rowIndex: Int) -> some View {
@@ -616,12 +666,77 @@ struct ContainerDetailView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .contentShape(Rectangle())
-            .background(rowIndex.isMultiple(of: 2) ? AppTheme.terminalSecondaryBackground.opacity(0.55) : Color.clear)
+            .background(rowIndex.isMultiple(of: 2) ? AppTheme.fileBrowserRowBackground.opacity(0.72) : Color.clear)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            fileEntryContextMenu(entry)
+        }
         .overlay(alignment: .bottom) {
             Divider()
                 .opacity(0.45)
+        }
+    }
+
+    @ViewBuilder
+    private func fileEntryContextMenu(_ entry: ContainerFileEntry) -> some View {
+        let path = joinedContainerPath(browserPath, entry.name)
+        if entry.isDirectory {
+            Button {
+                browserPath = path
+                containerPath = path
+                Task { await loadContainerDirectory() }
+            } label: {
+                Label(language.localized("Open Folder"), systemImage: "folder")
+            }
+
+            Button {
+                openDirectoryInTerminal(path)
+            } label: {
+                Label(language.localized("Open in Terminal"), systemImage: "terminal")
+            }
+        }
+
+        Button {
+            copyToClipboard(path)
+        } label: {
+            Label(language.localized("Copy Path"), systemImage: "doc.on.doc")
+        }
+
+        Button {
+            copyToClipboard("\(container.id):\(path)")
+        } label: {
+            Label(language.localized("Copy Container Reference"), systemImage: "terminal")
+        }
+
+        Button {
+            copyDirection = .fromContainer
+            containerPath = path
+            showsFileTransfer = true
+        } label: {
+            Label(language.localized("Use as Copy Source"), systemImage: "arrow.down.doc")
+        }
+
+        Button {
+            copyDirection = .toContainer
+            containerPath = entry.isDirectory ? path : browserPath
+            showsFileTransfer = true
+        } label: {
+            Label(language.localized("Paste from Mac Here"), systemImage: "arrow.up.doc")
+        }
+
+        Button {
+            copyEntryToMac(entry)
+        } label: {
+            Label(language.localized("Copy to Mac..."), systemImage: "square.and.arrow.down")
+        }
+
+        Divider()
+
+        Button {
+            Task { await loadContainerDirectory() }
+        } label: {
+            Label(language.localized("Refresh"), systemImage: "arrow.clockwise")
         }
     }
 
@@ -644,7 +759,7 @@ struct ContainerDetailView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.terminalSecondaryBackground)
+        .background(AppTheme.fileBrowserRowBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
@@ -668,7 +783,7 @@ struct ContainerDetailView: View {
     // MARK: - Stats Tab
 
     private var statsView: some View {
-        StatsView(containerId: container.id)
+        StatsView(containerId: container.id, service: cliBackend)
     }
 
     // MARK: - Actions
@@ -692,14 +807,25 @@ struct ContainerDetailView: View {
 
     private func copyLogsToClipboard() {
         let logs = filteredLogEntries.map(\.content).joined(separator: "\n")
+        copyToClipboard(logs)
+    }
+
+    private func copyToClipboard(_ value: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(logs, forType: .string)
+        NSPasteboard.general.setString(value, forType: .string)
+    }
+
+    private func loadLogs() async {
+        let viewModel = logViewModel ?? LogStreamViewModel(service: cliBackend, containerId: container.id)
+        logViewModel = viewModel
+        await viewModel.loadLogs()
     }
 
     private var filteredLogEntries: [LogEntry] {
         let query = logSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return logViewModel.logs }
-        return logViewModel.logs.filter { $0.content.localizedCaseInsensitiveContains(query) }
+        let logs = logViewModel?.logs ?? []
+        guard !query.isEmpty else { return logs }
+        return logs.filter { $0.content.localizedCaseInsensitiveContains(query) }
     }
 
     private var filteredLogText: String {
@@ -778,6 +904,10 @@ struct ContainerDetailView: View {
 
         isRunningFileAction = true
         fileActionStatus = nil
+        fileOperationProgress = OperationProgress(
+            title: "Copying files",
+            detail: "\(cleanedContainerPath) -> \(cleanedLocalPath)"
+        )
         defer { isRunningFileAction = false }
 
         let containerReference = "\(container.id):\(cleanedContainerPath)"
@@ -785,13 +915,51 @@ struct ContainerDetailView: View {
         do {
             switch copyDirection {
             case .fromContainer:
-                try await cliBackend.copyContainerPath(source: containerReference, destination: cleanedLocalPath)
+                try await cliBackend.copyContainerPath(source: containerReference, destination: cleanedLocalPath) { chunk in
+                    Task { @MainActor in fileOperationProgress?.append(chunk) }
+                }
             case .toContainer:
-                try await cliBackend.copyContainerPath(source: cleanedLocalPath, destination: containerReference)
+                try await cliBackend.copyContainerPath(source: cleanedLocalPath, destination: containerReference) { chunk in
+                    Task { @MainActor in fileOperationProgress?.append(chunk) }
+                }
             }
             fileActionStatus = "Copy completed."
+            fileOperationProgress?.finish("Copy completed.")
+            await loadContainerDirectory()
         } catch {
             fileActionStatus = error.localizedDescription
+            fileOperationProgress?.finish(error.localizedDescription)
+        }
+    }
+
+    private func copyEntryToMac(_ entry: ContainerFileEntry) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = language.localized("Copy")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let path = joinedContainerPath(browserPath, entry.name)
+        let destination = url.appendingPathComponent(entry.name).path
+        containerPath = path
+        localPath = destination
+        copyDirection = .fromContainer
+        showsFileTransfer = true
+
+        Task { await copyFiles() }
+    }
+
+    private func openDirectoryInTerminal(_ path: String) {
+        terminalSession.activateIfNeeded()
+        terminalSession.appendLocalEcho("\n# cd \(path)\n")
+        Task {
+            do {
+                try await terminalSession.send(command: "cd \(shellQuote(path)) && pwd")
+            } catch {
+                terminalSession.appendLocalEcho("Error: \(error.localizedDescription)\n")
+            }
         }
     }
 
@@ -801,15 +969,37 @@ struct ContainerDetailView: View {
         if panel.runModal() == .OK, let url = panel.url {
             Task {
                 isRunningFileAction = true
+                fileOperationProgress = OperationProgress(
+                    title: "Exporting container",
+                    detail: url.path
+                )
                 defer { isRunningFileAction = false }
                 do {
-                    _ = try await cliBackend.exportContainer(id: container.id, outputPath: url.path)
+                    _ = try await cliBackend.exportContainer(id: container.id, outputPath: url.path) { chunk in
+                        Task { @MainActor in fileOperationProgress?.append(chunk) }
+                    }
                     fileActionStatus = "Exported to \(url.path)."
+                    fileOperationProgress?.finish("Export completed.")
                 } catch {
                     fileActionStatus = error.localizedDescription
+                    fileOperationProgress?.finish(error.localizedDescription)
                 }
             }
         }
+    }
+
+    private func clearFileOperationProgress() {
+        guard fileOperationProgress?.isRunning == false else { return }
+        fileOperationProgress = nil
+        fileActionStatus = nil
+    }
+
+    private func shellQuote(_ value: String) -> String {
+        let safeCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-")
+        if value.rangeOfCharacter(from: safeCharacters.inverted) == nil {
+            return value
+        }
+        return "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }
 
@@ -1052,6 +1242,7 @@ private struct ContainerInspectionDetails {
 @MainActor
 private struct StatsView: View {
     let containerId: String
+    let service: ContainerServiceProtocol
     @State private var stats: ContainerStats?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -1325,7 +1516,7 @@ private struct StatsView: View {
         }
         errorMessage = nil
         do {
-            let rawStats = try await CLIBackend().stats(containerId: containerId)
+            let rawStats = try await service.stats(containerId: containerId)
             let now = Date()
             let cpuPercent = rawStats.resolvedCPUPercent(
                 previousUsageUsec: previousCPUUsageUsec,
@@ -1500,11 +1691,11 @@ private enum ContainerStatsStore {
         return Date().timeIntervalSince(lastUpdatedAt) < freshnessInterval
     }
 
-    static func preloadIfNeeded(containerId: String) async {
+    static func preloadIfNeeded(containerId: String, service: ContainerServiceProtocol) async {
         guard !hasFreshSnapshot(for: containerId) else { return }
 
         do {
-            let rawStats = try await CLIBackend().stats(containerId: containerId)
+            let rawStats = try await service.stats(containerId: containerId)
             let now = Date()
             let stats = rawStats.withCPUPercent(rawStats.cpuPercent)
             let cpuHistory = [ResourceDataPoint(timestamp: now, value: stats.cpuPercent)]

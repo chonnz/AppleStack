@@ -2,38 +2,53 @@
 
 [简体中文](README.zh-CN.md)
 
-AppleStack is a native macOS desktop app for managing Apple's open source [`container`](https://github.com/apple/container) CLI with a visual workflow inspired by OrbStack. It provides a focused GUI for containers, images, volumes, networks, Linux machines, registries, live resource monitoring, and common Apple container commands.
+AppleStack is a native macOS app for managing Apple's open source [`container`](https://github.com/apple/container) CLI from a visual desktop interface. It keeps the power of the command line, but turns daily container, image, volume, network, Linux machine, registry, monitoring, and diagnostic workflows into clickable macOS screens.
 
 AppleStack is not an Apple product. It is an independent open source client built on top of Apple's `container` command line tool.
 
-## Features
+## What It Does
 
-- **Containers**: list, create, start, stop, restart, kill, delete, inspect, view logs, open terminals, copy files, and export filesystems.
-- **Images**: pull, build, load, tag, push, save, inspect, group by usage, and delete images.
-- **Volumes and networks**: create, inspect, delete, prune, and search local resources.
-- **Linux machines**: create, start, stop, delete, inspect, view logs, configure CPU/memory/home mount, and build machine-oriented images.
-- **Registry management**: view registry logins, log in, and log out.
-- **Activity Monitor**: view container and machine resource rows with live CPU, memory, network, and disk charts.
-- **System dashboard**: check runtime status, disk usage, logs, DNS, properties, kernel settings, and builder status.
-- **Commands reference**: copy ready-to-run `container` command examples for common workflows.
-- **Menu bar utility**: monitor runtime status and quickly start/stop containers or the Apple container system.
-- **Internationalization**: English and Simplified Chinese, switchable in Settings.
+- **Manage containers**: create, start, stop, restart, kill, delete, inspect, view logs, open terminals, copy files, and export filesystems.
+- **Manage images**: pull, build, load, tag, push, save, inspect, group by usage, and remove local images.
+- **Work with storage and networks**: create, inspect, search, prune, and delete volumes and networks.
+- **Create Linux machines**: build ready-to-use Linux machines from presets, configure CPU, memory, and home folder access, then open logs, files, terminals, and inspect output.
+- **Use registries**: review registry login state, log in, and log out.
+- **Monitor resources**: view live CPU, memory, network, and disk usage for containers and machines.
+- **Run common commands faster**: copy ready-to-run `container` command examples from the built-in command reference.
+- **Control the runtime from macOS**: use the main window or menu bar utility to check status and start or stop the Apple container system.
+
+## Who It Is For
+
+- Developers who use Apple `container` and want a faster local desktop workflow.
+- Teams evaluating Apple's container stack on macOS and Apple silicon.
+- Engineers who remember Docker Desktop or OrbStack-style workflows and want similar navigation for Apple `container`.
+- Users who can run container commands, but prefer visual status, guided forms, and safer destructive actions.
+- People helping less technical teammates use local containers without teaching every CLI subcommand first.
+
+## Highlights
+
+- **Native macOS UI**: SwiftUI app with sidebar navigation, compact toolbars, menu bar access, keyboard shortcuts, system sheets, and light/dark mode support.
+- **Beginner-friendly path**: Quick Start helps users check the CLI path, start the runtime, create the first container or Linux machine, and open resource monitoring.
+- **Operational safety**: destructive actions use confirmation dialogs, long image and machine operations show progress, and runtime connection errors offer retry/start-system actions.
+- **Machine-first support**: Linux machine creation includes system presets, resource presets, default-machine options, logs, files, terminals, and inspect views.
+- **CLI-compatible design**: AppleStack calls the local `container` executable, so behavior remains close to the official CLI and is easier to test.
+- **Bilingual interface**: English and Simplified Chinese are available in Settings.
 
 ## Requirements
 
 - macOS 15 or later.
-- Xcode command line tools or Xcode with Swift 6 support.
+- Xcode Command Line Tools or Xcode with Swift 6 support.
 - Apple's [`container`](https://github.com/apple/container) CLI installed.
 - Apple silicon is recommended because Apple's container stack is optimized for it.
 
-## Install Apple container
+## Install Apple Container
 
 Install the `container` CLI from Apple's official project:
 
 - GitHub: <https://github.com/apple/container>
 - Documentation: <https://apple.github.io/container/documentation/>
 
-After installation, verify that the CLI is available:
+Verify the CLI after installation:
 
 ```bash
 container system status
@@ -41,7 +56,7 @@ container system status
 
 If `container` is installed outside your shell `PATH`, open AppleStack Settings and set the CLI path manually.
 
-## Build and Run
+## Deploy Locally
 
 Clone the repository:
 
@@ -68,22 +83,20 @@ Open the app:
 open build/AppleStack.app
 ```
 
-Run tests:
+Run the test suite:
 
 ```bash
 swift test
 ```
 
-## Settings
+## How To Use
 
-AppleStack currently supports these settings:
-
-- Interface language: English or Simplified Chinese.
-- Apple Containers CLI path.
-- Container list behavior, including whether stopped containers are shown by default.
-- List refresh interval.
-- Terminal font size.
-- System controls for runtime status, DNS, kernel path, logs, properties, and builder state.
+1. Open AppleStack and go to **Settings > CLI** if the `container` executable is not found automatically.
+2. Use **Quick Start** to start the Apple container runtime.
+3. Create a container, pull an image, or create a Linux machine from the sidebar or Quick Start cards.
+4. Select an item in a list to inspect details, logs, files, terminal access, stats, and raw CLI output.
+5. Use **Activity Monitor** to watch live resource usage.
+6. Use the menu bar item for quick status checks and runtime/container controls.
 
 ## Project Structure
 
@@ -98,9 +111,9 @@ Resources/         App bundle metadata
 scripts/           Local build scripts
 ```
 
-## Development Notes
+## Development
 
-AppleStack talks to the local `container` CLI instead of linking directly to Apple's container internals. This keeps the app simple and makes CLI compatibility easy to test. Most behavior is implemented through small SwiftUI views and backend command builders with tests covering command argument generation and parsing.
+AppleStack talks to the local `container` CLI instead of linking directly to Apple container internals. Prefer small SwiftUI changes, exact CLI argument tests, and source-level checks for user-facing workflows.
 
 Common development commands:
 
@@ -111,19 +124,6 @@ open build/AppleStack.app
 ```
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the current release scope, verification checklist, and known limitations.
-
-## Roadmap
-
-- Better coverage for every `container` CLI subcommand.
-- More complete machine and builder workflows.
-- Improved diagnostics when the Apple container system is not running.
-- Import/export helpers for app settings.
-- More localized strings and additional languages.
-- Signed and notarized release builds.
-
-## Contributing
-
-Issues and pull requests are welcome. For UI changes, please keep the app native, compact, and consistent with macOS desktop conventions. For backend changes, prefer adding or updating tests that verify the exact `container` CLI arguments and output parsing behavior.
 
 ## License
 
