@@ -2,6 +2,11 @@
 
 [简体中文](README.zh-CN.md)
 
+## Releases
+
+[Download latest release](https://github.com/chonnz/AppleStack/releases)
+
+
 AppleStack is a native macOS app for managing Apple's open source [`container`](https://github.com/apple/container) CLI from a visual desktop interface. It keeps the power of the command line, but turns daily container, image, volume, network, Linux machine, registry, monitoring, and diagnostic workflows into clickable macOS screens.
 
 AppleStack is not an Apple product. It is an independent open source client built on top of Apple's `container` command line tool.
